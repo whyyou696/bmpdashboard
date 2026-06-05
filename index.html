@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Multi Payment - Transaction Dashboard</title>
+    <meta name="description" content="Premium real-time transaction monitoring and dashboard for Best Multi Payment.">
+    <link rel="icon" type="image/png" href="assets/logo_best.png">
+    <meta property="og:image" content="assets/logo_best.png">
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Animated Background Blobs -->
+    <div class="bg-bubbles">
+        <div class="bubble bubble-1"></div>
+        <div class="bubble bubble-2"></div>
+        <div class="bubble bubble-3"></div>
+    </div>
+    <div class="app-container" id="app-container" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <img src="assets/logo_best.png" alt="Best Multi Payment Logo" class="brand-logo">
+                <div class="logo-text">BMP<span>Dashboard</span></div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" id="nav-dashboard">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-refresh">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Force Sync</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-logout" style="margin-top: auto; color: var(--failed);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator online"></div>
+                <span>Connected to DB</span>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1 id="main-heading">Transaction Dashboard</h1>
+                    <p class="subtitle">Monitor and analyze your OtomaX transaction data</p>
+                </div>
+                <div class="header-actions">
+                    <div class="time-widget">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="current-time">Loading time...</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- KPI Summary Stats -->
+            <section class="stats-grid" aria-label="Key Performance Indicators">
+                <!-- Stat Card: Total -->
+                <div class="stat-card" id="card-total">
+                    <div class="stat-icon-wrapper total">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Transactions</span>
+                        <h2 class="stat-value" id="stat-total-val">-</h2>
+                        <span class="stat-meta">Lifetime records</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Success -->
+                <div class="stat-card" id="card-success">
+                    <div class="stat-icon-wrapper success">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Successful</span>
+                        <h2 class="stat-value" id="stat-success-val">-</h2>
+                        <span class="stat-meta" id="stat-success-pct">0% Success rate</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Failed -->
+                <div class="stat-card" id="card-failed">
+                    <div class="stat-icon-wrapper failed">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Failed / Cancelled</span>
+                        <h2 class="stat-value" id="stat-failed-val">-</h2>
+                        <span class="stat-meta" id="stat-failed-pct">0% Failed/Canceled</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Pending/Other -->
+                <div class="stat-card" id="card-pending">
+                    <div class="stat-icon-wrapper pending">
+                        <i class="fa-solid fa-spinner fa-spin-slow"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Pending / In-Process</span>
+                        <h2 class="stat-value" id="stat-pending-val">-</h2>
+                        <span class="stat-meta">Awaiting response</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Financial Summary Stats -->
+            <section class="stats-grid financial-grid" aria-label="Financial Indicators">
+                <!-- Stat Card: Retail Price -->
+                <div class="stat-card" id="card-retail">
+                    <div class="stat-icon-wrapper retail">
+                        <i class="fa-solid fa-cash-register"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Retail Price</span>
+                        <h2 class="stat-value text-indigo" id="stat-retail-val">-</h2>
+                        <span class="stat-meta">From successful txs</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Cost Price -->
+                <div class="stat-card" id="card-cost">
+                    <div class="stat-icon-wrapper cost">
+                        <i class="fa-solid fa-tags"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Cost Price</span>
+                        <h2 class="stat-value text-purple" id="stat-cost-val">-</h2>
+                        <span class="stat-meta">From successful txs</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Profit -->
+                <div class="stat-card" id="card-profit">
+                    <div class="stat-icon-wrapper profit">
+                        <i class="fa-solid fa-money-bill-trend-up"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Profit</span>
+                        <h2 class="stat-value text-success" id="stat-profit-val">-</h2>
+                        <span class="stat-meta">Earnings from sales</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trend Chart Section -->
+            <section class="chart-section" aria-label="Transaction Trend Chart">
+                <div class="chart-header">
+                    <div class="chart-title-container">
+                        <h2 class="chart-title">Transaction Trends</h2>
+                        <p class="subtitle" id="chart-subtitle">Showing trends for the last 7 days</p>
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="transaction-chart"></canvas>
+                </div>
+            </section>
+
+            <!-- Filters and Data Table -->
+            <section class="table-section" aria-label="Transaction Records">
+                <!-- Table Controls Header -->
+                <div class="table-controls">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search by destination, code, product..."
+                            aria-label="Search transactions">
+                    </div>
+
+                    <div class="filter-actions">
+                        <div class="date-filter-wrapper">
+                            <i class="fa-solid fa-calendar-days date-icon"></i>
+                            <input type="date" id="date-filter" aria-label="Filter by Date">
+                            <button id="btn-clear-date" title="Clear Date" class="btn-clear-date">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <div class="select-wrapper">
+                            <i class="fa-solid fa-filter select-icon"></i>
+                            <select id="status-filter" aria-label="Filter by Status">
+                                <option value="all">All Statuses</option>
+                                <option value="20">Success (20)</option>
+                                <option value="40">Failed (40)</option>
+                                <option value="50">Canceled (50)</option>
+                                <option value="55">Auto Refund (55)</option>
+                            </select>
+                        </div>
+
+                        <div class="select-wrapper">
+                            <i class="fa-solid fa-list select-icon"></i>
+                            <select id="limit-filter" aria-label="Rows per page">
+                                <option value="5" selected>5 Rows</option>
+                                <option value="10">10 Rows</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Data Table -->
+                <div class="table-container">
+                    <table id="transactions-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Code</th>
+                                <th scope="col">Date & Time</th>
+                                <th scope="col">Product</th>
+                                <th scope="col">Destination</th>
+                                <th scope="col" class="text-right">Retail Price</th>
+                                <th scope="col" class="text-right">Cost Price</th>
+                                <th scope="col" class="text-right">Profit</th>
+                                <th scope="col">SN / Reference</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Rows injected dynamically -->
+                            <tr class="placeholder-row">
+                                <td colspan="9">
+                                    <div class="table-loader-wrapper">
+                                        <div class="spinner"></div>
+                                        <span>Fetching transactions...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Pagination Footer -->
+                <footer class="table-footer">
+                    <div class="pagination-info" id="pagination-info">
+                        Showing 0 to 0 of 0 transactions
+                    </div>
+                    <nav class="pagination-controls" aria-label="Pagination Navigation">
+                        <button class="btn-pagination" id="btn-prev" disabled>
+                            <i class="fa-solid fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="page-numbers" id="page-numbers">
+                            <!-- Page buttons injected dynamically -->
+                        </div>
+                        <button class="btn-pagination" id="btn-next" disabled>
+                            Next <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </nav>
+                </footer>
+            </section>
+        </main>
+    </div>
+
+    <!-- Login Screen -->
+    <div class="login-container" id="login-container" style="display: none;">
+        <div class="login-card">
+            <div class="login-header">
+                <img src="assets/logo_best.png" alt="Best Multi Payment Logo" class="login-logo">
+                <h2>BMP Dashboard</h2>
+                <p>Sign in to access your transaction panel</p>
+            </div>
+            <form id="login-form" class="login-form">
+                <div class="input-group">
+                    <label for="username"><i class="fa-regular fa-user"></i> Username</label>
+                    <input type="text" id="username" required placeholder="Enter your username" autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="password"><i class="fa-solid fa-lock"></i> Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" required placeholder="Enter your password"
+                            autocomplete="current-password">
+                        <i class="fa-regular fa-eye toggle-password" id="toggle-password"></i>
+                    </div>
+                </div>
+                <div class="error-box" id="error-box" style="display: none;">
+                    <i class="fa-solid fa-circle-exclamation"></i> <span id="error-msg">Invalid credentials</span>
+                </div>
+                <button type="submit" class="btn-login" id="btn-login">
+                    <span>Sign In</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Script file -->
+    <script src="app.js"></script>
+</body>
+
+</html>
