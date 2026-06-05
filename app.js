@@ -38,6 +38,36 @@ const chartSubtitle = document.getElementById('chart-subtitle');
 
 // Initialize Dashboard
 document.addEventListener('DOMContentLoaded', () => {
+    // Theme initialization
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    const htmlEl = document.documentElement;
+    const themeToggleIcon = document.getElementById('theme-toggle-icon');
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    
+    if (savedTheme === 'dark') {
+        htmlEl.classList.add('dark');
+        if (themeToggleIcon) {
+            themeToggleIcon.classList.remove('fa-moon');
+            themeToggleIcon.classList.add('fa-sun');
+        }
+    }
+
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            const isDark = htmlEl.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            if (themeToggleIcon) {
+                if (isDark) {
+                    themeToggleIcon.classList.remove('fa-moon');
+                    themeToggleIcon.classList.add('fa-sun');
+                } else {
+                    themeToggleIcon.classList.remove('fa-sun');
+                    themeToggleIcon.classList.add('fa-moon');
+                }
+            }
+        });
+    }
+
     // Auth & Session DOM elements
     const loginContainer = document.getElementById('login-container');
     const appContainer = document.getElementById('app-container');
