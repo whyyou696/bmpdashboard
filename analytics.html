@@ -131,6 +131,10 @@
                     <i class="fa-solid fa-chart-pie"></i>
                     <span>Analytics</span>
                 </a>
+                <a href="inbox" class="nav-item" id="nav-inbox">
+                    <i class="fa-solid fa-inbox"></i>
+                    <span>Inbox</span>
+                </a>
                 <a href="#" class="nav-item" id="nav-refresh-analytics">
                     <i class="fa-solid fa-rotate"></i>
                     <span>Force Sync</span>
@@ -170,14 +174,17 @@
             <!-- SECTION 1 - ANALYTICS FILTER BAR -->
             <section class="sticky-filter bg-[#f8fafc]/80 dark:bg-darkBg/80 p-4 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <!-- Quick Date Filters -->
-                <div class="flex flex-wrap items-center gap-2" id="quick-filters-container">
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200" data-range="today">Today</button>
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200" data-range="yesterday">Yesterday</button>
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200" data-range="7days">Last 7 Days</button>
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-brandBlue text-white border border-brandBlue shadow-sm transition-all duration-200" data-range="30days" id="btn-default-range">Last 30 Days</button>
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200" data-range="thismonth">This Month</button>
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200" data-range="lastmonth">Last Month</button>
-                    <button class="px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200" data-range="custom">Custom Range</button>
+                <div class="flex items-center gap-2">
+                    <label for="filter-date-range" class="text-xs font-bold text-slate-400 uppercase tracking-wider">Date Range</label>
+                    <select id="filter-date-range" class="px-4 py-2 text-xs font-semibold rounded-full border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] outline-none cursor-pointer hover:border-brandBlue transition-all shadow-sm duration-200">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="30days" selected>Last 30 Days</option>
+                        <option value="thismonth">This Month</option>
+                        <option value="lastmonth">Last Month</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
                 </div>
 
                 <!-- Custom Range Inputs (Hidden by default) -->

@@ -954,6 +954,494 @@ app.get("/analytics", (req, res) => {
     res.sendFile(path.join(__dirname, "analytics.html"));
 });
 
+// ==========================================
+// INBOX ROUTE & API ENDPOINTS
+// ==========================================
+
+// Route to serve Inbox HTML page (with access logging)
+app.get("/inbox", (req, res) => {
+    console.log(`[USER ACTIVITY] User accessed Inbox page at ${new Date().toISOString()}`);
+    res.sendFile(path.join(__dirname, "inbox.html"));
+});
+
+// Helper to map status codes to labels
+function getInboxStatusLabel(statusTrx, statusInbox) {
+    if (statusTrx !== null && statusTrx !== undefined) {
+        if (statusTrx === 20) return 'Success';
+        if (statusTrx === 52) return 'Duplicate Transaction';
+        if (statusTrx === 40 || statusTrx === 50) return 'Failed';
+        if (statusTrx === 55) return 'Failed';
+        if (statusTrx === 0 || statusTrx === 2) return 'Processing';
+        return 'Pending';
+    }
+    if (statusInbox === 20) return 'Success';
+    if (statusInbox === 46) return 'Duplicate Transaction';
+    if (statusInbox === 40) return 'Failed';
+    return 'Pending';
+}
+
+// GET /api/inbox/filters
+app.get("/api/inbox/filters", async (req, res) => {
+    try {
+        const pool = await sql.connect(config);
+        
+        const resellers = await pool.request().query("SELECT kode, nama FROM reseller WHERE aktif = 1 ORDER BY nama");
+        const products = await pool.request().query("SELECT DISTINCT kode_produk FROM transaksi WHERE kode_produk IS NOT NULL AND kode_produk != '' ORDER BY kode_produk");
+        const terminals = await pool.request().query("SELECT DISTINCT kode_terminal FROM inbox WHERE kode_terminal IS NOT NULL ORDER BY kode_terminal");
+        const serviceCenters = await pool.request().query("SELECT DISTINCT service_center FROM inbox WHERE service_center IS NOT NULL AND service_center != '' ORDER BY service_center");
+        
+        res.json({
+            resellers: resellers.recordset,
+            products: products.recordset.map(r => r.kode_produk),
+            terminals: terminals.recordset.map(r => r.kode_terminal),
+            serviceCenters: serviceCenters.recordset.map(r => r.service_center)
+        });
+    } catch (err) {
+        console.error("API Error /api/inbox/filters:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/inbox (Paginated, sorted, filtered transactions)
+app.get("/api/inbox", async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+        
+        const search = req.query.search || "";
+        const reseller = req.query.reseller || "";
+        const product = req.query.product || "";
+        const status = req.query.status || "";
+        const terminal = req.query.terminal || "";
+        const serviceCenter = req.query.serviceCenter || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
+
+        const pool = await sql.connect(config);
+        const request = pool.request();
+
+        let conditions = [];
+
+        if (search) {
+            conditions.push("(i.pengirim LIKE @search OR i.pesan LIKE @search OR i.kode_reseller LIKE @search OR r.nama LIKE @search OR t.kode_produk LIKE @search OR t.tujuan LIKE @search OR t.ref_id LIKE @search OR CAST(i.kode_transaksi AS VARCHAR) LIKE @search)");
+            request.input("search", sql.VarChar, `%${search}%`);
+        }
+
+        if (reseller) {
+            conditions.push("i.kode_reseller = @reseller");
+            request.input("reseller", sql.VarChar, reseller);
+        }
+
+        if (product) {
+            conditions.push("t.kode_produk = @product");
+            request.input("product", sql.VarChar, product);
+        }
+
+        if (terminal) {
+            conditions.push("i.kode_terminal = @terminal");
+            request.input("terminal", sql.Int, parseInt(terminal));
+        }
+
+        if (serviceCenter) {
+            conditions.push("i.service_center = @serviceCenter");
+            request.input("serviceCenter", sql.VarChar, serviceCenter);
+        }
+
+        if (startDate && endDate) {
+            conditions.push("i.tgl_entri >= @startDate AND i.tgl_entri <= @endDate");
+            request.input("startDate", sql.DateTime2, new Date(startDate));
+            request.input("endDate", sql.DateTime2, new Date(endDate + 'T23:59:59.999'));
+        }
+
+        // Status filter translation
+        if (status) {
+            if (status === 'Success') {
+                conditions.push("(t.status = 20 OR (t.status IS NULL AND i.status = 20))");
+            } else if (status === 'Duplicate Transaction') {
+                conditions.push("(t.status = 52 OR (t.status IS NULL AND i.status = 46))");
+            } else if (status === 'Failed') {
+                conditions.push("(t.status IN (40, 50, 55) OR (t.status IS NULL AND i.status = 40))");
+            } else if (status === 'Processing') {
+                conditions.push("(t.status IN (0, 2))");
+            } else if (status === 'Pending') {
+                conditions.push("((t.status NOT IN (20, 40, 50, 52, 55, 0, 2) OR t.status IS NULL) AND i.status NOT IN (20, 40, 46))");
+            }
+        }
+
+        const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+        // Total count
+        let total = 0;
+        if (whereClause === "") {
+            const countResult = await request.query(`
+                SELECT CAST(SUM(p.rows) AS INT) AS total 
+                FROM sys.partitions p
+                INNER JOIN sys.tables t ON p.object_id = t.object_id
+                WHERE t.name = 'inbox' AND p.index_id IN (0, 1)
+            `);
+            total = countResult.recordset[0].total || 0;
+        } else {
+            const countResult = await request.query(`
+                SELECT COUNT(*) AS total 
+                FROM inbox i
+                LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+                LEFT JOIN reseller r ON i.kode_reseller = r.kode
+                ${whereClause}
+            `);
+            total = countResult.recordset[0].total || 0;
+        }
+
+        // Paging parameters
+        request.input("offset", sql.Int, offset);
+        request.input("limit", sql.Int, limit);
+
+        // Sort params
+        const sortCol = req.query.sortCol || "created_at";
+        const sortDir = req.query.sortDir === "asc" ? "ASC" : "DESC";
+        let sqlSort = "i.tgl_entri DESC";
+        if (sortCol === "transaction_id") sqlSort = `i.kode_transaksi ${sortDir}`;
+        else if (sortCol === "created_at") sqlSort = `i.tgl_entri ${sortDir}`;
+        else if (sortCol === "reseller_code") sqlSort = `i.kode_reseller ${sortDir}`;
+        else if (sortCol === "reseller_name") sqlSort = `r.nama ${sortDir}`;
+        else if (sortCol === "product_code") sqlSort = `t.kode_produk ${sortDir}`;
+        else if (sortCol === "destination") sqlSort = `t.tujuan ${sortDir}`;
+        else if (sortCol === "status") sqlSort = `t.status ${sortDir}, i.status ${sortDir}`;
+        
+        const dataQuery = `
+            SELECT 
+                i.kode as inbox_id,
+                i.kode_transaksi as transaction_id,
+                i.tgl_entri as created_at,
+                i.pengirim as sender_ip,
+                i.kode_reseller as reseller_code,
+                r.nama as reseller_name,
+                t.kode_produk as product_code,
+                t.tujuan as destination,
+                i.pesan as message,
+                i.status as status_inbox,
+                t.status as status_trx,
+                i.kode_terminal as terminal,
+                i.service_center as service_center,
+                t.ref_id as reference_id
+            FROM inbox i
+            LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+            LEFT JOIN reseller r ON i.kode_reseller = r.kode
+            ${whereClause}
+            ORDER BY ${sqlSort}
+            OFFSET @offset ROWS
+            FETCH NEXT @limit ROWS ONLY
+        `;
+
+        const dataResult = await request.query(dataQuery);
+        
+        // Format results
+        const formattedData = dataResult.recordset.map(row => ({
+            inbox_id: row.inbox_id,
+            transaction_id: row.transaction_id || row.inbox_id,
+            created_at: row.created_at,
+            sender_ip: row.sender_ip,
+            reseller_code: row.reseller_code,
+            reseller_name: row.reseller_name || "-",
+            product_code: row.product_code || "-",
+            destination: row.destination || "-",
+            message: row.message,
+            status: getInboxStatusLabel(row.status_trx, row.status_inbox),
+            terminal: row.terminal || "-",
+            service_center: row.service_center || "-",
+            reference_id: row.reference_id || "-"
+        }));
+
+        res.json({
+            data: formattedData,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+
+    } catch (err) {
+        console.error("API Error /api/inbox:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/inbox/statistics (KPI values for today)
+app.get("/api/inbox/statistics", async (req, res) => {
+    try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        request.input("todayStart", sql.DateTime2, todayStart);
+
+        const query = `
+            SELECT
+                COUNT(*) as totalRequestsToday,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as successfulTxs,
+                SUM(CASE WHEN i.status = 46 OR t.status = 52 THEN 1 ELSE 0 END) as duplicateTxs,
+                SUM(CASE WHEN t.status IN (40, 50, 55) OR i.status = 40 THEN 1 ELSE 0 END) as failedTxs,
+                SUM(CASE WHEN t.status IS NULL AND i.status NOT IN (20, 40, 46) THEN 1 ELSE 0 END) as pendingTxs
+            FROM inbox i
+            LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+            WHERE i.tgl_entri >= @todayStart
+        `;
+
+        const result = await request.query(query);
+        const stats = result.recordset[0];
+
+        res.json({
+            totalRequestsToday: stats.totalRequestsToday || 0,
+            successfulTxs: stats.successfulTxs || 0,
+            duplicateTxs: stats.duplicateTxs || 0,
+            failedTxs: stats.failedTxs || 0,
+            pendingTxs: stats.pendingTxs || 0
+        });
+
+    } catch (err) {
+        console.error("API Error /api/inbox/statistics:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/inbox/charts (Line, Pie, Bar charts data)
+app.get("/api/inbox/charts", async (req, res) => {
+    try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        request.input("todayStart", sql.DateTime2, todayStart);
+
+        // Requests Per Hour (Line Chart)
+        const hourlyQuery = `
+            SELECT DATEPART(hour, tgl_entri) as hour, COUNT(*) as count
+            FROM inbox
+            WHERE tgl_entri >= @todayStart
+            GROUP BY DATEPART(hour, tgl_entri)
+            ORDER BY hour
+        `;
+        const hourlyResult = await request.query(hourlyQuery);
+
+        // Transaction Status Distribution (Pie Chart)
+        const statusQuery = `
+            SELECT 
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success,
+                SUM(CASE WHEN t.status IN (40, 50, 55) OR i.status = 40 THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN i.status = 46 OR t.status = 52 THEN 1 ELSE 0 END) as duplicate,
+                SUM(CASE WHEN t.status IN (0, 2) THEN 1 ELSE 0 END) as processing,
+                SUM(CASE WHEN t.status IS NULL AND i.status NOT IN (20, 40, 46) THEN 1 ELSE 0 END) as pending
+            FROM inbox i
+            LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+            WHERE i.tgl_entri >= @todayStart
+        `;
+        const statusResult = await request.query(statusQuery);
+
+        // Top Active Resellers (Bar Chart)
+        const resellersQuery = `
+            SELECT TOP 5 r.nama as reseller_name, COUNT(*) as count
+            FROM inbox i
+            INNER JOIN reseller r ON i.kode_reseller = r.kode
+            WHERE i.tgl_entri >= @todayStart
+            GROUP BY r.nama
+            ORDER BY count DESC
+        `;
+        const resellersResult = await request.query(resellersQuery);
+
+        // Most Used Products (Bar Chart)
+        const productsQuery = `
+            SELECT TOP 5 t.kode_produk as product_code, COUNT(*) as count
+            FROM inbox i
+            INNER JOIN transaksi t ON i.kode_transaksi = t.kode
+            WHERE i.tgl_entri >= @todayStart
+            GROUP BY t.kode_produk
+            ORDER BY count DESC
+        `;
+        const productsResult = await request.query(productsQuery);
+
+        res.json({
+            hourlyRequests: hourlyResult.recordset,
+            statusDistribution: statusResult.recordset[0],
+            topResellers: resellersResult.recordset,
+            topProducts: productsResult.recordset
+        });
+
+    } catch (err) {
+        console.error("API Error /api/inbox/charts:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/inbox/live (Real-time checks)
+app.get("/api/inbox/live", async (req, res) => {
+    try {
+        const lastId = parseInt(req.query.lastId) || 0;
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        let query = "";
+        if (lastId > 0) {
+            request.input("lastId", sql.BigInt, lastId);
+            query = `
+                SELECT TOP 10 
+                    i.kode as inbox_id,
+                    i.tgl_entri as created_at,
+                    i.pengirim as sender_ip,
+                    i.kode_reseller as reseller_code,
+                    r.nama as reseller_name,
+                    t.kode_produk as product_code,
+                    t.tujuan as destination,
+                    i.pesan as message,
+                    i.status as status_inbox,
+                    t.status as status_trx
+                FROM inbox i
+                LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+                LEFT JOIN reseller r ON i.kode_reseller = r.kode
+                WHERE i.kode > @lastId
+                ORDER BY i.kode DESC
+            `;
+        } else {
+            query = `
+                SELECT TOP 10 
+                    i.kode as inbox_id,
+                    i.tgl_entri as created_at,
+                    i.pengirim as sender_ip,
+                    i.kode_reseller as reseller_code,
+                    r.nama as reseller_name,
+                    t.kode_produk as product_code,
+                    t.tujuan as destination,
+                    i.pesan as message,
+                    i.status as status_inbox,
+                    t.status as status_trx
+                FROM inbox i
+                LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+                LEFT JOIN reseller r ON i.kode_reseller = r.kode
+                ORDER BY i.kode DESC
+            `;
+        }
+        
+        const result = await request.query(query);
+        
+        // Count today total requests
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const summaryResult = await pool.request()
+            .input("todayStart", sql.DateTime2, todayStart)
+            .query(`
+                SELECT MAX(kode) as maxId, COUNT(*) as countToday 
+                FROM inbox 
+                WHERE tgl_entri >= @todayStart
+            `);
+        
+        // Format live results
+        const formattedLive = result.recordset.map(row => ({
+            inbox_id: row.inbox_id,
+            transaction_id: row.kode_transaksi || row.inbox_id,
+            created_at: row.created_at,
+            sender_ip: row.sender_ip,
+            reseller_code: row.reseller_code,
+            reseller_name: row.reseller_name || "-",
+            product_code: row.product_code || "-",
+            destination: row.destination || "-",
+            message: row.message,
+            status: getInboxStatusLabel(row.status_trx, row.status_inbox)
+        }));
+
+        res.json({
+            maxId: summaryResult.recordset[0].maxId || 0,
+            countToday: summaryResult.recordset[0].countToday || 0,
+            newRequests: formattedLive
+        });
+
+    } catch (err) {
+        console.error("API Error /api/inbox/live:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/inbox/:id (Detailed row modal details)
+app.get("/api/inbox/:id", async (req, res) => {
+    try {
+        const inboxId = req.params.id;
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        request.input("inboxId", sql.BigInt, inboxId);
+
+        const query = `
+            SELECT 
+                i.kode as inbox_id,
+                i.kode_transaksi as transaction_id,
+                i.tgl_entri as created_at,
+                i.pengirim as sender_ip,
+                i.kode_reseller as reseller_code,
+                r.nama as reseller_name,
+                t.kode_produk as product_code,
+                t.tujuan as destination,
+                i.pesan as message,
+                i.status as status_inbox,
+                t.status as status_trx,
+                i.kode_terminal as terminal,
+                i.service_center as service_center,
+                t.ref_id as reference_id,
+                i.tgl_status as status_timestamp
+            FROM inbox i
+            LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
+            LEFT JOIN reseller r ON i.kode_reseller = r.kode
+            WHERE i.kode = @inboxId
+        `;
+
+        const result = await request.query(query);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: "Inbox entry not found" });
+        }
+
+        const row = result.recordset[0];
+
+        // Retrieve response message from outbox
+        let responseMessage = "-";
+        const replyQuery = `
+            SELECT TOP 1 pesan 
+            FROM outbox 
+            WHERE kode_inbox = @inboxId OR (kode_transaksi = @trxId AND kode_transaksi IS NOT NULL)
+            ORDER BY tgl_entri DESC
+        `;
+        const replyResult = await pool.request()
+            .input("inboxId", sql.BigInt, row.inbox_id)
+            .input("trxId", sql.Int, row.transaction_id)
+            .query(replyQuery);
+        
+        if (replyResult.recordset.length > 0) {
+            responseMessage = replyResult.recordset[0].pesan;
+        }
+
+        res.json({
+            transaction_id: row.transaction_id || row.inbox_id,
+            inbox_id: row.inbox_id,
+            created_at: row.created_at,
+            sender_ip: row.sender_ip,
+            reseller_code: row.reseller_code || "-",
+            reseller_name: row.reseller_name || "-",
+            message: row.message,
+            product_code: row.product_code || "-",
+            destination: row.destination || "-",
+            reference_id: row.reference_id || "-",
+            status: getInboxStatusLabel(row.status_trx, row.status_inbox),
+            response_message: responseMessage,
+            terminal: row.terminal || "-",
+            service_center: row.service_center || "-",
+            status_timestamp: row.status_timestamp
+        });
+
+    } catch (err) {
+        console.error("API Error /api/inbox/:id:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(3000, () => {
     console.log("API Dijalankan, Silahkan Buka http://localhost:3000/dashboard");
 });

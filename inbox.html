@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Multi Payment - Inbox</title>
+    <meta name="description" content="Premium real-time incoming transaction request and gateway monitoring panel.">
+    <link rel="icon" type="image/png" href="assets/logo_best.png">
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brandBlue: '#0052ff',
+                        brandSecondary: '#2563eb',
+                        brandCyan: '#06b6d4',
+                        darkBg: '#0f172a',
+                        darkCard: '#1e293b',
+                        darkBorder: 'rgba(51, 65, 85, 0.4)',
+                        lightBorder: 'rgba(226, 232, 240, 0.8)',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        failed: '#ef4444',
+                        failedDark: '#991b1b', // Dark Red
+                        processing: '#3b82f6',
+                    },
+                    fontFamily: {
+                        heading: ['Outfit', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .sticky-filter { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(16px); }
+        .glass-card { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(12px); }
+        .dark .glass-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(12px); }
+    </style>
+</head>
+
+<body class="bg-[#f8fafc] text-[#0f172a] dark:bg-darkBg dark:text-[#f8fafc] transition-colors duration-300">
+    <!-- Animated Background Blobs -->
+    <div class="bg-bubbles">
+        <div class="bubble bubble-1"></div>
+        <div class="bubble bubble-2"></div>
+        <div class="bubble bubble-3"></div>
+    </div>
+
+    <!-- App Container -->
+    <div class="app-container flex flex-col lg:flex-row min-h-screen" id="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar flex-shrink-0 lg:w-[260px]">
+            <div class="logo-area">
+                <img src="assets/logo_best.png" alt="Best Multi Payment Logo" class="brand-logo">
+                <div class="logo-text">BMP<span>Inbox</span></div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard" class="nav-item" id="nav-dashboard">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="analytics" class="nav-item" id="nav-analytics">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Analytics</span>
+                </a>
+                <a href="#" class="nav-item active" id="nav-inbox">
+                    <i class="fa-solid fa-inbox"></i>
+                    <span>Inbox</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-refresh-inbox">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Force Sync</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-logout" style="margin-top: auto; color: var(--failed);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator online"></div>
+                <span>Connected to DB</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content flex-grow p-6 lg:p-10 max-w-[1400px] mx-auto w-full flex flex-col gap-8">
+            <!-- Header Section -->
+            <header class="main-header flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 id="main-heading" class="text-3xl font-heading font-bold tracking-tight text-[#0f172a] dark:text-[#f8fafc]">Inbox</h1>
+                    <p class="subtitle text-[#475569] dark:text-[#94a3b8] text-sm">Real-Time Incoming Transaction Request Monitoring</p>
+                </div>
+                <div class="header-actions flex items-center gap-3">
+                    <!-- Live Transaction Indicator -->
+                    <div class="flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3.5 py-2 rounded-full text-xs font-bold shadow-sm">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span>Live Counter: </span>
+                        <span id="live-request-counter">0</span>
+                    </div>
+                    <!-- Theme Toggle -->
+                    <button id="theme-toggle" class="time-widget flex items-center justify-center w-11 h-11 rounded-full bg-white dark:bg-darkCard border border-lightBorder dark:border-darkBorder shadow-sm cursor-pointer transition-all duration-300 hover:scale-105" title="Toggle Dark Mode">
+                        <i class="fa-solid fa-moon text-lg" id="theme-toggle-icon"></i>
+                    </button>
+                    <!-- Clock -->
+                    <div class="time-widget bg-white dark:bg-darkCard border border-lightBorder dark:border-darkBorder rounded-full px-5 py-2.5 flex items-center gap-2 text-sm text-[#475569] dark:text-[#94a3b8] font-medium shadow-sm">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="current-time">Loading...</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Notifications Center (Injected dynamically) -->
+            <div id="live-notification-box" class="hidden transform translate-y-2 opacity-0 transition-all duration-300 ease-out bg-brandBlue/90 dark:bg-brandBlue/95 text-white p-4 rounded-2xl shadow-xl flex items-center justify-between gap-4 w-full">
+                <div class="flex items-center gap-3 text-sm">
+                    <i class="fa-solid fa-bell text-lg animate-bounce"></i>
+                    <div>
+                        <span class="font-bold block">New Requests Received</span>
+                        <span class="text-xs text-white/80" id="notification-message">0 new incoming requests were fetched just now.</span>
+                    </div>
+                </div>
+                <button class="text-xs font-bold uppercase hover:underline opacity-80 hover:opacity-100" id="btn-close-notification">Dismiss</button>
+            </div>
+
+            <!-- KPI Cards Section -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5" aria-label="KPI Counter Cards">
+                <!-- Total Requests Today -->
+                <div class="glass-card bg-white dark:bg-darkCard p-5 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md group">
+                    <div class="absolute top-0 left-0 w-full h-[3px] bg-brandBlue"></div>
+                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Total Requests Today</span>
+                    <h2 class="text-3xl font-heading font-extrabold tracking-tight mt-2 text-[#0f172a] dark:text-[#f8fafc]" id="kpi-requests-today">-</h2>
+                    <span class="text-[9px] text-slate-400 mt-2 block"><i class="fa-solid fa-arrows-rotate mr-1"></i>Auto 30s refresh</span>
+                </div>
+
+                <!-- Successful Transactions -->
+                <div class="glass-card bg-white dark:bg-darkCard p-5 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md group">
+                    <div class="absolute top-0 left-0 w-full h-[3px] bg-success"></div>
+                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Successful Transactions</span>
+                    <h2 class="text-3xl font-heading font-extrabold tracking-tight mt-2 text-success" id="kpi-success-today">-</h2>
+                    <span class="text-[9px] text-slate-400 mt-2 block"><i class="fa-solid fa-check mr-1"></i>Transaksis success (20)</span>
+                </div>
+
+                <!-- Pending Transactions -->
+                <div class="glass-card bg-white dark:bg-darkCard p-5 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md group">
+                    <div class="absolute top-0 left-0 w-full h-[3px] bg-warning"></div>
+                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Pending Transactions</span>
+                    <h2 class="text-3xl font-heading font-extrabold tracking-tight mt-2 text-warning" id="kpi-pending-today">-</h2>
+                    <span class="text-[9px] text-slate-400 mt-2 block"><i class="fa-solid fa-hourglass-half mr-1"></i>Waiting process</span>
+                </div>
+
+                <!-- Duplicate Transactions -->
+                <div class="glass-card bg-white dark:bg-darkCard p-5 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md group">
+                    <div class="absolute top-0 left-0 w-full h-[3px] bg-failed"></div>
+                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Duplicate Transactions</span>
+                    <h2 class="text-3xl font-heading font-extrabold tracking-tight mt-2 text-failed" id="kpi-duplicate-today">-</h2>
+                    <span class="text-[9px] text-slate-400 mt-2 block"><i class="fa-solid fa-circle-exclamation mr-1"></i>Code 52 / status 46</span>
+                </div>
+
+                <!-- Failed Transactions -->
+                <div class="glass-card bg-white dark:bg-darkCard p-5 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md group">
+                    <div class="absolute top-0 left-0 w-full h-[3px] bg-failedDark"></div>
+                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Failed Transactions</span>
+                    <h2 class="text-3xl font-heading font-extrabold tracking-tight mt-2 text-red-800 dark:text-red-400" id="kpi-failed-today">-</h2>
+                    <span class="text-[9px] text-slate-400 mt-2 block"><i class="fa-solid fa-circle-xmark mr-1"></i>Gagal / Canceled</span>
+                </div>
+            </section>
+
+            <!-- Filters Section -->
+            <section class="sticky-filter bg-[#f8fafc]/80 dark:bg-darkBg/80 p-4 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <!-- Date Range Filter -->
+                    <div class="flex flex-col gap-1.5">
+                        <label for="filter-date-range" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date Range</label>
+                        <select id="filter-date-range" class="px-3.5 py-2 text-xs rounded-xl border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard outline-none cursor-pointer">
+                            <option value="today" selected>Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="7days">Last 7 Days</option>
+                            <option value="30days">Last 30 Days</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+
+                    <!-- Reseller Filter -->
+                    <div class="flex flex-col gap-1.5">
+                        <label for="filter-reseller" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reseller</label>
+                        <select id="filter-reseller" class="px-3.5 py-2 text-xs rounded-xl border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard outline-none cursor-pointer">
+                            <option value="">All Resellers</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Product Filter -->
+                    <div class="flex flex-col gap-1.5">
+                        <label for="filter-product" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Product</label>
+                        <select id="filter-product" class="px-3.5 py-2 text-xs rounded-xl border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard outline-none cursor-pointer">
+                            <option value="">All Products</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="flex flex-col gap-1.5">
+                        <label for="filter-status" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</label>
+                        <select id="filter-status" class="px-3.5 py-2 text-xs rounded-xl border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard outline-none cursor-pointer">
+                            <option value="">All Statuses</option>
+                            <option value="Success">Success</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Duplicate Transaction">Duplicate</option>
+                            <option value="Failed">Failed</option>
+                            <option value="Processing">Processing</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Search and Action Buttons bar -->
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <!-- Search Input -->
+                    <div class="relative w-full sm:w-[350px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="inbox-search" placeholder="Search by IP, reseller, destination, product..." class="w-full pl-9 pr-4 py-2 text-xs rounded-full border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard text-[#0f172a] dark:text-[#f8fafc] outline-none focus:border-brandBlue transition-all" aria-label="Search Inbox Ledger">
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                        <button id="btn-refresh" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm" title="Refresh Data">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                        </button>
+                        <button id="btn-reset" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm" title="Reset Filters">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main Data Table Section -->
+            <section class="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm overflow-hidden flex flex-col hover:border-brandBlue/10 transition-all" aria-label="Inbox Transactions Ledger">
+                <div class="overflow-x-auto relative min-h-[300px]">
+                    <table class="w-full border-collapse text-left text-[11px]">
+                        <thead class="sticky top-0 bg-[#f1f5f9] dark:bg-slate-800 z-10 shadow-sm">
+                            <tr class="text-[#475569] dark:text-[#94a3b8] uppercase tracking-wider font-semibold">
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-txid">Transaction ID <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-date">Date Time <i class="fa-solid fa-sort-down ml-1"></i></th>
+                                <th class="p-3">IP Address</th>
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-reseller-code">Reseller Code <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-reseller-name">Reseller Name <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-product-code">Product Code <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-destination">Destination Number <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-3 max-w-[200px] truncate">Request Message</th>
+                                <th class="p-3 cursor-pointer hover:text-brandBlue select-none" id="sort-status">Status <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-3">Reference ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inbox-table-body" class="divide-y divide-lightBorder dark:divide-darkBorder">
+                            <!-- Injected dynamically -->
+                            <tr>
+                                <td colspan="10" class="p-12 text-center text-slate-400">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <div class="spinner"></div>
+                                        <span>Connecting and fetching ledger entries...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer Pagination -->
+                <footer class="p-4 border-t border-lightBorder dark:border-darkBorder flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-[#475569] dark:text-[#94a3b8]">
+                    <div id="inbox-pagination-info">Showing 0 to 0 of 0 requests</div>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-inbox-prev" class="px-3.5 py-2 rounded-xl border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1 shadow-sm" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <div id="inbox-page-numbers" class="flex gap-1"></div>
+                        <button id="btn-inbox-next" class="px-3.5 py-2 rounded-xl border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1 shadow-sm" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+                        <button id="btn-load-more" class="px-3.5 py-2 rounded-xl border border-[#2563eb]/20 text-[#2563eb] bg-white dark:bg-darkCard hover:bg-[#2563eb]/5 font-semibold flex items-center gap-1 shadow-sm ml-2" title="Load more entries directly to table bottom">Infinite Load</button>
+                    </div>
+                </footer>
+            </section>
+
+            <!-- Analytics Dashboard Widgets Section -->
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-8" aria-label="Analytics Visualization Charts">
+                <!-- Requests Per Hour Line Chart -->
+                <div class="bg-white dark:bg-darkCard p-6 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm hover:border-brandBlue/15 transition-all">
+                    <div>
+                        <h3 class="text-base font-heading font-extrabold text-[#0f172a] dark:text-[#f8fafc]">Requests Per Hour</h3>
+                        <p class="text-xs text-slate-400">Incoming request traffic hourly distribution.</p>
+                    </div>
+                    <div class="h-64 mt-4">
+                        <canvas id="chart-requests-hour"></canvas>
+                    </div>
+                </div>
+
+                <!-- Transaction Status Distribution Pie Chart -->
+                <div class="bg-white dark:bg-darkCard p-6 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm hover:border-brandBlue/15 transition-all">
+                    <div>
+                        <h3 class="text-base font-heading font-extrabold text-[#0f172a] dark:text-[#f8fafc]">Transaction Status Distribution</h3>
+                        <p class="text-xs text-slate-400">Transaction outcome breakdown for today.</p>
+                    </div>
+                    <div class="h-64 mt-4 flex justify-center">
+                        <div class="w-60 h-60">
+                            <canvas id="chart-status-dist"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Active Resellers Bar Chart -->
+                <div class="bg-white dark:bg-darkCard p-6 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm hover:border-brandBlue/15 transition-all">
+                    <div>
+                        <h3 class="text-base font-heading font-extrabold text-[#0f172a] dark:text-[#f8fafc]">Top Active Resellers</h3>
+                        <p class="text-xs text-slate-400">Most active resellers by request count today.</p>
+                    </div>
+                    <div class="h-64 mt-4">
+                        <canvas id="chart-top-resellers"></canvas>
+                    </div>
+                </div>
+
+                <!-- Most Used Products Bar Chart -->
+                <div class="bg-white dark:bg-darkCard p-6 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm hover:border-brandBlue/15 transition-all">
+                    <div>
+                        <h3 class="text-base font-heading font-extrabold text-[#0f172a] dark:text-[#f8fafc]">Most Used Products</h3>
+                        <p class="text-xs text-slate-400">Products with the highest request volumes today.</p>
+                    </div>
+                    <div class="h-64 mt-4">
+                        <canvas id="chart-most-products"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Transaction Detail Modal -->
+    <div id="inbox-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+        <div class="bg-white dark:bg-darkCard rounded-3xl border border-lightBorder dark:border-darkBorder shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-all duration-300 flex flex-col">
+            <!-- Modal Header -->
+            <div class="p-6 border-b border-lightBorder dark:border-darkBorder flex justify-between items-center bg-slate-50 dark:bg-slate-800/40 rounded-t-3xl">
+                <div>
+                    <h3 class="text-lg font-heading font-extrabold text-[#0f172a] dark:text-[#f8fafc]">Transaction Request Detail</h3>
+                    <p class="text-xs text-slate-400" id="detail-inbox-id-title">Inbox ID: -</p>
+                </div>
+                <button class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 outline-none transition-colors" id="btn-close-modal">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 space-y-5 flex-grow text-xs">
+                <!-- Status Badge Banner -->
+                <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-lightBorder dark:border-darkBorder">
+                    <span class="font-bold uppercase tracking-wider text-slate-500">Transaction Status:</span>
+                    <span id="detail-status" class="badge">Checking...</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Date and Time -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-created-at">-</p>
+                    </div>
+                    <!-- Status Timestamp -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Status Timestamp</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-status-timestamp">-</p>
+                    </div>
+
+                    <!-- Reseller Code -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Reseller Code</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-reseller-code">-</p>
+                    </div>
+                    <!-- Reseller Name -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Reseller Name</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-reseller-name">-</p>
+                    </div>
+
+                    <!-- Product Code -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Product Code</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-product-code">-</p>
+                    </div>
+                    <!-- Destination Number -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Destination Number</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-destination">-</p>
+                    </div>
+
+                    <!-- Sender IP -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Sender IP / Source</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-sender-ip">-</p>
+                    </div>
+                    <!-- Reference ID -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Reference ID</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-reference-id">-</p>
+                    </div>
+
+                    <!-- Terminal -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Terminal</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-terminal">-</p>
+                    </div>
+                    <!-- Service Center -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-lightBorder/40">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Service Center</span>
+                        <p class="font-semibold text-slate-800 dark:text-[#f8fafc] mt-1" id="detail-service-center">-</p>
+                    </div>
+                </div>
+
+                <!-- Request Message -->
+                <div class="p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-lightBorder relative group">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Request Message</span>
+                    <pre class="whitespace-pre-wrap font-mono text-slate-700 dark:text-slate-300 mt-2 pr-16" id="detail-request-message">-</pre>
+                    <button class="absolute top-4 right-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 outline-none shadow-sm transition-all" id="btn-copy-request">
+                        <i class="fa-regular fa-copy"></i> Copy Message
+                    </button>
+                </div>
+
+                <!-- Response / Outbox Reply Message -->
+                <div class="p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-lightBorder relative">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Response Message (Outbox Reply)</span>
+                    <pre class="whitespace-pre-wrap font-mono text-slate-700 dark:text-slate-300 mt-2" id="detail-response-message">-</pre>
+                </div>
+            </div>
+
+            <!-- Modal Footer Actions -->
+            <div class="p-6 border-t border-lightBorder dark:border-darkBorder bg-slate-50 dark:bg-slate-800/40 rounded-b-3xl flex items-center justify-end gap-3.5">
+                <button class="px-5 py-2.5 bg-brandBlue hover:bg-brandSecondary text-white rounded-xl font-semibold flex items-center gap-1.5 shadow-sm text-xs outline-none transition-all" id="btn-copy-transaction">
+                    <i class="fa-regular fa-copy"></i> Copy Transaction ID
+                </button>
+                <button class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold text-xs outline-none transition-all" id="btn-close-modal-footer">
+                    Close Detail
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Page Script -->
+    <script src="inbox.js"></script>
+</body>
+
+</html>

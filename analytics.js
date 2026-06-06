@@ -32,7 +32,7 @@ const themeToggleIcon = document.getElementById('theme-toggle-icon');
 const demoModeBadge = document.getElementById('demo-mode-badge');
 
 // Filter DOM Elements
-const quickFiltersContainer = document.getElementById('quick-filters-container');
+const filterDateRange = document.getElementById('filter-date-range');
 const customRangeInputs = document.getElementById('custom-range-inputs');
 const startDateInput = document.getElementById('start-date');
 const endDateInput = document.getElementById('end-date');
@@ -122,18 +122,9 @@ function initTheme() {
 // Event Listeners Wire-up
 function initEventListeners() {
     // Quick Range Filters
-    if (quickFiltersContainer) {
-        quickFiltersContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('button');
-            if (!btn) return;
-            
-            // Set active class
-            Array.from(quickFiltersContainer.children).forEach(child => {
-                child.className = "px-4 py-2 rounded-full text-xs font-semibold bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] border border-lightBorder dark:border-darkBorder hover:border-brandBlue transition-all shadow-sm duration-200";
-            });
-            btn.className = "px-4 py-2 rounded-full text-xs font-semibold bg-brandBlue text-white border border-brandBlue shadow-sm transition-all duration-200";
-            
-            const range = btn.dataset.range;
+    if (filterDateRange) {
+        filterDateRange.addEventListener('change', (e) => {
+            const range = e.target.value;
             currentRange = range;
             
             if (range === 'custom') {
