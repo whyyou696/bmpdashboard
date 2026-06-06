@@ -17,6 +17,7 @@ const config = {
     options: {
         encrypt: false,
         trustServerCertificate: true,
+        useUTC: false,
     },
 };
 
@@ -876,7 +877,7 @@ app.get("/api/analytics/export", async (req, res) => {
             
             content = "Date,Product,Destination,Revenue,Cost,Profit,Margin %,Status,SN\r\n";
             data.forEach(row => {
-                const profit = row.harga - row.harga_beli;
+                const profit = row.status === 20 ? (row.harga - row.harga_beli) : 0;
                 const margin = row.harga > 0 ? ((profit / row.harga) * 100).toFixed(1) : 0;
                 content += `"${row.tgl_entri}","${row.kode_produk}","${row.tujuan}",${row.harga},${row.harga_beli},${profit},"${margin}%",${row.status},"${row.sn || ''}"\r\n`;
             });
@@ -886,7 +887,7 @@ app.get("/api/analytics/export", async (req, res) => {
             
             content = "Date\tProduct\tDestination\tRevenue\tCost\tProfit\tMargin %\tStatus\tSN\r\n";
             data.forEach(row => {
-                const profit = row.harga - row.harga_beli;
+                const profit = row.status === 20 ? (row.harga - row.harga_beli) : 0;
                 const margin = row.harga > 0 ? ((profit / row.harga) * 100).toFixed(1) : 0;
                 content += `${row.tgl_entri}\t${row.kode_produk}\t${row.tujuan}\t${row.harga}\t${row.harga_beli}\t${profit}\t${margin}%\t${row.status}\t${row.sn || ''}\r\n`;
             });
@@ -922,8 +923,8 @@ app.get("/api/analytics/export", async (req, res) => {
             res.setHeader('Content-Disposition', `attachment; filename=${filename}.csv`);
             content = "Date,Product,Destination,Revenue,Cost,Profit,Margin %,Status,SN\r\n";
             simulatedRows.forEach(row => {
-                const profit = row.harga - row.harga_beli;
-                const margin = ((profit / row.harga) * 100).toFixed(1);
+                const profit = row.status === 20 ? (row.harga - row.harga_beli) : 0;
+                const margin = row.harga > 0 ? ((profit / row.harga) * 100).toFixed(1) : 0;
                 content += `"${row.tgl_entri}","${row.kode_produk}","${row.tujuan}",${row.harga},${row.harga_beli},${profit},"${margin}%",${row.status},"${row.sn}"\r\n`;
             });
         } else {
@@ -931,8 +932,8 @@ app.get("/api/analytics/export", async (req, res) => {
             res.setHeader('Content-Disposition', `attachment; filename=${filename}.xls`);
             content = "Date\tProduct\tDestination\tRevenue\tCost\tProfit\tMargin %\tStatus\tSN\r\n";
             simulatedRows.forEach(row => {
-                const profit = row.harga - row.harga_beli;
-                const margin = ((profit / row.harga) * 100).toFixed(1);
+                const profit = row.status === 20 ? (row.harga - row.harga_beli) : 0;
+                const margin = row.harga > 0 ? ((profit / row.harga) * 100).toFixed(1) : 0;
                 content += `${row.tgl_entri}\t${row.kode_produk}\t${row.tujuan}\t${row.harga}\t${row.harga_beli}\t${profit}\t${margin}%\t${row.status}\t${row.sn}\r\n`;
             });
         }

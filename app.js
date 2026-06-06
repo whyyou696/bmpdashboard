@@ -615,7 +615,7 @@ function renderTable(transactions) {
     }
 
     transactions.forEach(item => {
-        const profit = (item.harga && item.harga_beli) ? (item.harga - item.harga_beli) : 0;
+        const profit = (item.status === 20 && item.harga && item.harga_beli) ? (item.harga - item.harga_beli) : 0;
         const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
         
         const row = document.createElement('tr');

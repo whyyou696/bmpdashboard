@@ -1054,7 +1054,7 @@ function renderFeedList(transactions, append = false) {
                 ${statusBadge}
                 <div>
                     <div class="font-bold text-slate-800 dark:text-[#f8fafc] text-xs">${item.productCode} (${item.destination})</div>
-                    <div class="text-[10px] text-slate-400">Code: ${item.kode || item.id}</div>
+                    <div class="text-[10px] text-slate-400">TRXID: ${item.kode || item.id}</div>
                 </div>
             </div>
             <div class="text-right text-xs font-semibold text-slate-400">
@@ -1145,7 +1145,7 @@ async function fetchTableData() {
     // Loader
     tableBody.innerHTML = `
         <tr>
-            <td colspan="8" class="p-8 text-center text-slate-400">
+            <td colspan="9" class="p-8 text-center text-slate-400">
                 <div class="flex items-center justify-center gap-2">
                     <div class="spinner"></div>
                     <span>Fetching analytics ledger records...</span>
@@ -1181,7 +1181,7 @@ async function fetchTableData() {
     } catch (error) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="8" class="p-8 text-center text-red-500 font-semibold">
+                <td colspan="9" class="p-8 text-center text-red-500 font-semibold">
                     Failed to Load Table Data: ${error.message}
                 </td>
             </tr>
@@ -1216,8 +1216,8 @@ function sortTableData() {
             valA = a.harga || 0;
             valB = b.harga || 0;
         } else if (tableSortCol === 'profit') {
-            valA = (a.harga && a.harga_beli) ? (a.harga - a.harga_beli) : 0;
-            valB = (b.harga && b.harga_beli) ? (b.harga - b.harga_beli) : 0;
+            valA = (a.status === 20 && a.harga && a.harga_beli) ? (a.harga - a.harga_beli) : 0;
+            valB = (b.status === 20 && b.harga && b.harga_beli) ? (b.harga - b.harga_beli) : 0;
         } else { // date
             valA = new Date(a.tgl_entri || 0).getTime();
             valB = new Date(b.tgl_entri || 0).getTime();
@@ -1272,7 +1272,7 @@ function renderTableRows() {
     if (displayedData.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="8" class="p-8 text-center text-slate-400">
+                <td colspan="9" class="p-8 text-center text-slate-400">
                     No matching records found.
                 </td>
             </tr>
@@ -1284,7 +1284,7 @@ function renderTableRows() {
         const date = new Date(item.tgl_entri);
         const dateText = date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         
-        const profit = (item.harga && item.harga_beli) ? (item.harga - item.harga_beli) : 0;
+        const profit = (item.status === 20 && item.harga && item.harga_beli) ? (item.harga - item.harga_beli) : 0;
         const profitClass = profit >= 0 ? 'text-success font-semibold' : 'text-failed font-semibold';
         
         const marginPct = (item.harga > 0) ? ((profit / item.harga) * 100).toFixed(1) + '%' : '0%';
@@ -1302,6 +1302,7 @@ function renderTableRows() {
         const row = document.createElement('tr');
         row.className = "hover:bg-slate-50/55 dark:hover:bg-slate-800/30 transition-colors";
         row.innerHTML = `
+            <td class="p-4 font-semibold text-slate-800 dark:text-[#f8fafc]" style="font-family: monospace;">${item.kode || '-'}</td>
             <td class="p-4 font-medium text-slate-500">${dateText}</td>
             <td class="p-4 font-bold text-[#0f172a] dark:text-[#f8fafc]"><span class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[10px]">${item.kode_produk}</span></td>
             <td class="p-4 font-semibold">${item.tujuan}</td>
