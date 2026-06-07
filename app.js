@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const htmlEl = document.documentElement;
     const themeToggleIcon = document.getElementById('theme-toggle-icon');
     const themeToggleBtn = document.getElementById('theme-toggle');
-    
+
     if (savedTheme === 'dark') {
         htmlEl.classList.add('dark');
         if (themeToggleIcon) {
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateTime();
     setInterval(updateTime, 1000);
-    
+
     // Check session login state
     const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
     if (isLoggedIn) {
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (username === 'adm01' && password === 'admpas01') {
                 errorBox.style.display = 'none';
                 sessionStorage.setItem('isLoggedIn', 'true');
-                
+
                 // Fade out animation
                 loginContainer.style.animation = 'fadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
                 setTimeout(() => {
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 errorBox.style.display = 'flex';
                 errorMsg.textContent = 'Username atau password salah!';
-                
+
                 // Re-trigger shake animation
                 errorBox.style.animation = 'none';
                 void errorBox.offsetWidth; // trigger reflow
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPage = 1;
         fetchData();
     });
-    
+
     btnPrev.addEventListener('click', () => {
         if (currentPage > 1) {
             currentPage--;
@@ -211,7 +211,7 @@ function updateTime() {
 // Fetch Data from Server (with Pagination & Filters)
 async function fetchData(updateStats = true) {
     showTableLoading();
-    
+
     const searchVal = searchInput.value.trim();
     const statusVal = statusFilter.value;
     const dateVal = dateFilter.value;
@@ -236,7 +236,7 @@ async function fetchData(updateStats = true) {
         if (!response.ok) {
             throw new Error(`API Error: ${response.status}`);
         }
-        
+
         const payload = await response.json();
         const transactions = payload.data || [];
         const pagination = payload.pagination || {};
@@ -265,7 +265,7 @@ async function fetchStats(dateVal = '') {
             throw new Error(`Stats Error: ${response.status}`);
         }
         const stats = await response.json();
-        
+
         // Populate stats on UI
         animateValue(statTotalVal, stats.total);
         animateValue(statSuccessVal, stats.successCount);
@@ -278,7 +278,7 @@ async function fetchStats(dateVal = '') {
         animateValue(statProfitVal, stats.totalProfit, true);
 
         statSuccessPct.textContent = `${stats.successRate}% Success rate`;
-        
+
         const failedPct = stats.total > 0 ? ((stats.failedCount / stats.total) * 100).toFixed(1) : 0;
         statFailedPct.textContent = `${failedPct}% Failed/Canceled`;
     } catch (error) {
@@ -289,26 +289,26 @@ async function fetchStats(dateVal = '') {
 // Counter animation with currency support
 function animateValue(element, target, isCurrency = false) {
     if (!element) return;
-    
+
     let rawText = element.textContent.replace(/[^\d-]/g, ''); // keep only digits and minus sign
     let current = parseInt(rawText) || 0;
     if (isNaN(current)) current = 0;
-    
+
     const duration = 600; // ms
     const stepTime = 15;
     const steps = duration / stepTime;
     const increment = (target - current) / steps;
-    
+
     let step = 0;
     const timer = setInterval(() => {
         current += increment;
         step++;
-        
+
         const formatVal = (val) => {
             const formatted = Math.round(val).toLocaleString('id-ID');
             return isCurrency ? `Rp ${formatted}` : formatted;
         };
-        
+
         if (step >= steps) {
             clearInterval(timer);
             element.textContent = formatVal(target);
@@ -354,23 +354,23 @@ function renderChart(data, isHourly = false) {
     const canvas = document.getElementById('transaction-chart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
+
     // Destroy previous chart if it exists
     if (trendChart) {
         trendChart.destroy();
     }
-    
+
     let labels = [];
     let successData = [];
     let failedData = [];
     let profitData = [];
-    
+
     if (isHourly) {
         const hourlyMap = {};
         data.forEach(item => {
             hourlyMap[item.label] = item;
         });
-        
+
         for (let h = 0; h < 24; h++) {
             labels.push(`${String(h).padStart(2, '0')}:00`);
             const item = hourlyMap[h];
@@ -386,18 +386,18 @@ function renderChart(data, isHourly = false) {
                 if (!isNaN(date.getTime())) {
                     dateLabel = date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
                 }
-            } catch (e) {}
+            } catch (e) { }
             labels.push(dateLabel);
             successData.push(item.success);
             failedData.push(item.failed);
             profitData.push(item.profit);
         });
     }
-    
+
     const profitGradient = ctx.createLinearGradient(0, 0, 0, 300);
     profitGradient.addColorStop(0, 'rgba(0, 82, 255, 0.18)');
     profitGradient.addColorStop(1, 'rgba(0, 82, 255, 0.0)');
-    
+
     trendChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -466,7 +466,7 @@ function renderChart(data, isHourly = false) {
                     padding: 12,
                     cornerRadius: 8,
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             let label = context.dataset.label || '';
                             if (label) {
                                 label += ': ';
@@ -507,7 +507,7 @@ function renderChart(data, isHourly = false) {
                             family: 'Inter',
                             size: 10
                         },
-                        callback: function(value) {
+                        callback: function (value) {
                             return value.toLocaleString('id-ID');
                         }
                     },
@@ -534,7 +534,7 @@ function renderChart(data, isHourly = false) {
                             family: 'Inter',
                             size: 10
                         },
-                        callback: function(value) {
+                        callback: function (value) {
                             if (value >= 1000000) {
                                 return 'Rp ' + (value / 1000000).toFixed(1) + 'M';
                             } else if (value >= 1000) {
@@ -569,7 +569,7 @@ function formatDateTime(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
-    
+
     return date.toLocaleDateString('id-ID', {
         day: '2-digit',
         month: '2-digit',
@@ -617,7 +617,7 @@ function renderTable(transactions) {
     transactions.forEach(item => {
         const profit = (item.status === 20 && item.harga && item.harga_beli) ? (item.harga - item.harga_beli) : 0;
         const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
-        
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td style="font-weight: 600; font-family: monospace;">${item.kode || '-'}</td>
@@ -647,14 +647,14 @@ function updatePaginationInfo() {
 
     // Generate page numbers buttons
     pageNumbersContainer.innerHTML = '';
-    
+
     if (totalPages <= 1) return;
 
     // Show dynamic numbers range (surrounding current page)
     const maxVisibleButtons = 5;
     let startPage = Math.max(1, currentPage - 2);
     let endPage = Math.min(totalPages, startPage + maxVisibleButtons - 1);
-    
+
     if (endPage - startPage < maxVisibleButtons - 1) {
         startPage = Math.max(1, endPage - maxVisibleButtons + 1);
     }

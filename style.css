@@ -1012,6 +1012,27 @@ tr:hover td {
     animation: shake 0.4s ease;
 }
 
+.vpn-alert {
+    background: var(--pending-bg);
+    border: 1px solid var(--pending-border);
+    color: var(--pending);
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: left;
+}
+
+.vpn-alert i {
+    font-size: 1.1rem;
+    color: var(--pending);
+    flex-shrink: 0;
+}
+
 .btn-login {
     background: linear-gradient(135deg, var(--vivid-blue), var(--blue));
     color: #ffffff;

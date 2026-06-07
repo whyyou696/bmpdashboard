@@ -214,6 +214,7 @@ function getChartGridColor() {
 
 // Fetch and draw Charts
 async function fetchCharts() {
+    if (!document.getElementById("chart-requests-hour")) return;
     try {
         const response = await fetch(`${API_BASE_URL}/api/inbox/charts`);
         if (!response.ok) throw new Error("Failed to load chart metrics");
