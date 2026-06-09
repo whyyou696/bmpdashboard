@@ -91,7 +91,7 @@
                         <i class="fa-solid fa-list-check"></i>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Total Transactions</span>
+                        <span class="stat-label">Total TRX</span>
                         <h2 class="stat-value" id="stat-total-val">-</h2>
                         <span class="stat-meta">Lifetime records</span>
                     </div>
@@ -115,9 +115,45 @@
                         <i class="fa-solid fa-circle-xmark"></i>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Failed / Cancelled</span>
+                        <span class="stat-label">Failed</span>
                         <h2 class="stat-value" id="stat-failed-val">-</h2>
-                        <span class="stat-meta" id="stat-failed-pct">0% Failed/Canceled</span>
+                        <span class="stat-meta" id="stat-failed-pct">0% Failed</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Cancelled -->
+                <div class="stat-card" id="card-canceled">
+                    <div class="stat-icon-wrapper canceled">
+                        <i class="fa-solid fa-ban"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Canceled</span>
+                        <h2 class="stat-value" id="stat-canceled-val">-</h2>
+                        <span class="stat-meta" id="stat-canceled-pct">0% Canceled</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Suspect -->
+                <div class="stat-card" id="card-suspect">
+                    <div class="stat-icon-wrapper suspect">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Suspect</span>
+                        <h2 class="stat-value" id="stat-suspect-val">-</h2>
+                        <span class="stat-meta" id="stat-suspect-pct">0% Suspect</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Suspect -->
+                <div class="stat-card" id="card-suspect">
+                    <div class="stat-icon-wrapper suspect">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Wrong Number</span>
+                        <h2 class="stat-value" id="stat-suspect-val">-</h2>
+                        <span class="stat-meta" id="stat-suspect-pct">0% Wrong Number</span>
                     </div>
                 </div>
 
@@ -127,7 +163,7 @@
                         <i class="fa-solid fa-spinner fa-spin-slow"></i>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Pending / In-Process</span>
+                        <span class="stat-label">Timeout</span>
                         <h2 class="stat-value" id="stat-pending-val">-</h2>
                         <span class="stat-meta">Awaiting response</span>
                     </div>
@@ -212,7 +248,8 @@
                                 <option value="20">Success (20)</option>
                                 <option value="40">Failed (40)</option>
                                 <option value="50">Canceled (50)</option>
-                                <option value="55">Auto Refund (55)</option>
+                                <option value="suspect">Suspect (51)</option>
+                                <option value="55">Timeout (55)</option>
                             </select>
                         </div>
 
@@ -223,6 +260,20 @@
                                 <option value="10">10 Rows</option>
                             </select>
                         </div>
+
+                        <div class="switch-container" style="margin-right: 8px;">
+                            <span>Auto Refresh</span>
+                            <label class="switch">
+                                <input type="checkbox" id="auto-refresh-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <button id="btn-refresh-dash" class="btn-refresh-dash" title="Refresh Data">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                        </button>
+                        <button id="btn-reset-dash" class="btn-reset-dash" title="Reset Filters">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                        </button>
                     </div>
                 </div>
 
@@ -277,45 +328,13 @@
         </main>
     </div>
 
-    <!-- Login Screen -->
-    <div class="login-container" id="login-container" style="display: none;">
-        <div class="login-card">
-            <div class="login-header">
-                <img src="assets/logo_best.png" alt="Best Multi Payment Logo" class="login-logo">
-                <h2>BMP Dashboard</h2>
-                <p>Sign in to access your Dashboard</p>
-            </div>
-            <div class="vpn-alert">
-                <i class="fa-solid fa-shield-halved"></i>
-                <span>Please Connect to your OpenVPN before</span>
-            </div>
-            <form id="login-form" class="login-form">
-                <div class="input-group">
-                    <label for="username"><i class="fa-regular fa-user"></i> Username</label>
-                    <input type="text" id="username" required placeholder="Enter your username" autocomplete="username">
-                </div>
-                <div class="input-group">
-                    <label for="password"><i class="fa-solid fa-lock"></i> Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="password" required placeholder="Enter your password"
-                            autocomplete="current-password">
-                        <i class="fa-regular fa-eye toggle-password" id="toggle-password"></i>
-                    </div>
-                </div>
-                <div class="error-box" id="error-box" style="display: none;">
-                    <i class="fa-solid fa-circle-exclamation"></i> <span id="error-msg">Invalid credentials</span>
-                </div>
-                <button type="submit" class="btn-login" id="btn-login">
-                    <span>Sign In</span> <i class="fa-solid fa-arrow-right"></i>
-                </button>
-            </form>
-        </div>
-    </div>
 
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Script file -->
     <script src="app.js"></script>
+    <!-- System Log Widget -->
+    <script src="system-log-widget.js"></script>
 </body>
 
 </html>

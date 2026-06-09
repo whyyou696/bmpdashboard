@@ -25,7 +25,7 @@ const API_BASE_URL = (window.location.protocol === 'file:') ? 'http://localhost:
 const authCheck = () => {
     const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
     if (!isLoggedIn) {
-        window.location.href = 'dashboard';
+        window.location.href = 'login';
     }
 };
 
@@ -161,7 +161,8 @@ function refreshAllData() {
 // Fetch Statistics KPI Cards
 async function fetchStatistics() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/inbox/statistics`);
+        const queryParams = getFiltersQueryParams();
+        const response = await fetch(`${API_BASE_URL}/api/inbox/statistics?${queryParams.toString()}`);
         if (!response.ok) throw new Error("Failed to load statistics");
         const stats = await response.json();
 
@@ -424,12 +425,14 @@ function getFiltersQueryParams() {
     const productVal = document.getElementById("filter-product").value;
     const statusVal = document.getElementById("filter-status").value;
     const dateRange = document.getElementById("filter-date-range").value;
+    const msgTypeVal = document.getElementById("filter-msg-type").value;
 
     const params = new URLSearchParams();
     if (searchVal) params.append("search", searchVal);
     if (resellerVal) params.append("reseller", resellerVal);
     if (productVal) params.append("product", productVal);
     if (statusVal) params.append("status", statusVal);
+    if (msgTypeVal) params.append("msgType", msgTypeVal);
 
     // Compute Date Range
     let startDate = "";
@@ -444,16 +447,9 @@ function getFiltersQueryParams() {
         yest.setDate(yest.getDate() - 1);
         startDate = formatDateISO(yest);
         endDate = formatDateISO(yest);
-    } else if (dateRange === "7days") {
-        const past = new Date(today);
-        past.setDate(past.getDate() - 7);
-        startDate = formatDateISO(past);
-        endDate = formatDateISO(today);
-    } else if (dateRange === "30days") {
-        const past = new Date(today);
-        past.setDate(past.getDate() - 30);
-        startDate = formatDateISO(past);
-        endDate = formatDateISO(today);
+    } else if (dateRange === "custom") {
+        startDate = document.getElementById("start-date").value;
+        endDate = document.getElementById("end-date").value;
     }
 
     if (startDate && endDate) {
@@ -516,7 +512,7 @@ function renderTableRows(records, appendMode = false) {
         }
 
         tr.innerHTML = `
-            <td class="p-3 font-bold text-slate-800 dark:text-[#f8fafc]" style="font-family: monospace;">${row.transaction_id || row.inbox_id}</td>
+            <td class="p-3 font-bold text-slate-800 dark:text-[#f8fafc]" style="font-family: monospace;">${row.inbox_id}</td>
             <td class="p-3 text-slate-500 whitespace-nowrap">${formattedDate}</td>
             <td class="p-3 font-semibold text-slate-600 dark:text-slate-400">${row.sender_ip}</td>
             <td class="p-3 font-mono font-medium">${row.reseller_code}</td>
@@ -608,6 +604,13 @@ function startLivePolling() {
     }, 30000);
 }
 
+function stopLivePolling() {
+    if (liveInterval) {
+        clearInterval(liveInterval);
+        liveInterval = null;
+    }
+}
+
 // Show live notification popup
 function showLiveNotification(count) {
     const box = document.getElementById("live-notification-box");
@@ -680,10 +683,10 @@ async function openDetailModal(inboxId) {
             badge.className += " bg-processing/15 text-processing border border-processing/20";
         }
 
-        // Copy transaction ID handler
-        const btnCopyTx = document.getElementById("btn-copy-transaction");
+        // Copy inbox ID handler
+        const btnCopyTx = document.getElementById("btn-copy-inbox");
         btnCopyTx.onclick = () => {
-            navigator.clipboard.writeText(details.transaction_id);
+            navigator.clipboard.writeText(details.inbox_id);
             showTemporaryToast(btnCopyTx, "Copied ID!");
         };
 
@@ -748,23 +751,23 @@ async function triggerClientSideExport(format) {
         let filename = `BMP_Inbox_Export_${format.toUpperCase()}`;
 
         if (format === 'csv') {
-            content = "Transaction ID,Date Time,IP Address,Reseller Code,Reseller Name,Product,Destination,Status,Terminal,Service Center,Reference ID\r\n";
+            content = "Inbox ID,Date Time,IP Address,Reseller Code,Reseller Name,Product,Destination,Status,Terminal,Service Center,Reference ID\r\n";
             records.forEach(row => {
                 const dateObj = new Date(row.created_at);
                 const formattedDate = dateObj.toLocaleDateString('id-ID') + ' ' + dateObj.toLocaleTimeString('id-ID');
                 
-                content += `"${row.transaction_id}","${formattedDate}","${row.sender_ip}","${row.reseller_code}","${row.reseller_name}","${row.product_code}","${row.destination}","${row.status}","${row.terminal}","${row.service_center}","${row.reference_id}"\r\n`;
+                content += `"${row.inbox_id}","${formattedDate}","${row.sender_ip}","${row.reseller_code}","${row.reseller_name}","${row.product_code}","${row.destination}","${row.status}","${row.terminal}","${row.service_center}","${row.reference_id}"\r\n`;
             });
 
             downloadBlobFile(content, "text/csv;charset=utf-8;", `${filename}.csv`);
         } else {
             // Excel XLS (as tab delimited file, compatible with Excel)
-            content = "Transaction ID\tDate Time\tIP Address\tReseller Code\tReseller Name\tProduct\tDestination\tStatus\tTerminal\tService Center\tReference ID\r\n";
+            content = "Inbox ID\tDate Time\tIP Address\tReseller Code\tReseller Name\tProduct\tDestination\tStatus\tTerminal\tService Center\tReference ID\r\n";
             records.forEach(row => {
                 const dateObj = new Date(row.created_at);
                 const formattedDate = dateObj.toLocaleDateString('id-ID') + ' ' + dateObj.toLocaleTimeString('id-ID');
                 
-                content += `${row.transaction_id}\t${formattedDate}\t${row.sender_ip}\t${row.reseller_code}\t${row.reseller_name}\t${row.product_code}\t${row.destination}\t${row.status}\t${row.terminal}\t${row.service_center}\t${row.reference_id}\r\n`;
+                content += `${row.inbox_id}\t${formattedDate}\t${row.sender_ip}\t${row.reseller_code}\t${row.reseller_name}\t${row.product_code}\t${row.destination}\t${row.status}\t${row.terminal}\t${row.service_center}\t${row.reference_id}\r\n`;
             });
 
             downloadBlobFile(content, "application/vnd.ms-excel;charset=utf-8;", `${filename}.xls`);
@@ -804,6 +807,18 @@ function attachEventListeners() {
     // Close notification bubble
     document.getElementById("btn-close-notification").addEventListener('click', dismissNotification);
 
+    // Auto Refresh Toggler
+    const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
+    if (autoRefreshToggle) {
+        autoRefreshToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                startLivePolling();
+            } else {
+                stopLivePolling();
+            }
+        });
+    }
+
     // Refresh and Reset
     document.getElementById("btn-refresh").addEventListener('click', () => {
         inboxPage = 1;
@@ -816,6 +831,11 @@ function attachEventListeners() {
         document.getElementById("filter-product").value = "";
         document.getElementById("filter-status").value = "";
         document.getElementById("filter-date-range").value = "today";
+        document.getElementById("filter-msg-type").value = "";
+        document.getElementById("start-date").value = "";
+        document.getElementById("end-date").value = "";
+        document.getElementById("custom-range-inputs").classList.add("hidden");
+        document.getElementById("custom-date-error").classList.add("hidden");
         inboxPage = 1;
         refreshAllData();
     });
@@ -873,7 +893,7 @@ function attachEventListeners() {
         });
     };
 
-    attachSortHeader("sort-txid", "transaction_id");
+    attachSortHeader("sort-txid", "inbox_id");
     attachSortHeader("sort-date", "created_at");
     attachSortHeader("sort-reseller-code", "reseller_code");
     attachSortHeader("sort-reseller-name", "reseller_name");
@@ -882,15 +902,73 @@ function attachEventListeners() {
     attachSortHeader("sort-status", "status");
 
     // Dynamic Filter triggers
-    ['filter-reseller', 'filter-product', 'filter-status', 'filter-date-range'].forEach(id => {
+    ['filter-reseller', 'filter-product', 'filter-status', 'filter-msg-type'].forEach(id => {
         const select = document.getElementById(id);
         if (select) {
             select.addEventListener('change', () => {
                 inboxPage = 1;
-                fetchTable(false);
+                refreshAllData();
             });
         }
     });
+
+    const dateRangeSelect = document.getElementById("filter-date-range");
+    if (dateRangeSelect) {
+        dateRangeSelect.addEventListener('change', () => {
+            const customInputs = document.getElementById("custom-range-inputs");
+            const dateError = document.getElementById("custom-date-error");
+            if (dateRangeSelect.value === 'custom') {
+                customInputs.classList.remove("hidden");
+                customInputs.classList.add("flex");
+                dateError.classList.add("hidden");
+            } else {
+                customInputs.classList.add("hidden");
+                dateError.classList.add("hidden");
+                document.getElementById("start-date").value = "";
+                document.getElementById("end-date").value = "";
+                inboxPage = 1;
+                refreshAllData();
+            }
+        });
+    }
+
+    // Apply button for custom range
+    const btnApplyCustom = document.getElementById("btn-apply-custom");
+    if (btnApplyCustom) {
+        btnApplyCustom.addEventListener('click', () => {
+            const startVal = document.getElementById("start-date").value;
+            const endVal = document.getElementById("end-date").value;
+            const errorEl = document.getElementById("custom-date-error");
+
+            if (!startVal || !endVal) {
+                errorEl.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>Please select both dates!';
+                errorEl.classList.remove("hidden");
+                return;
+            }
+
+            const startD = new Date(startVal);
+            const endD = new Date(endVal);
+
+            if (endD < startD) {
+                errorEl.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>End date cannot be earlier than start date!';
+                errorEl.classList.remove("hidden");
+                return;
+            }
+
+            const diffTime = Math.abs(endD - startD);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+            if (diffDays > 3) {
+                errorEl.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>Maximal date range is 3 days!';
+                errorEl.classList.remove("hidden");
+                return;
+            }
+
+            errorEl.classList.add("hidden");
+            inboxPage = 1;
+            refreshAllData();
+        });
+    }
 
     // Debounced search
     let searchTimeout;
@@ -898,7 +976,7 @@ function attachEventListeners() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
             inboxPage = 1;
-            fetchTable(false);
+            refreshAllData();
         }, 500);
     });
 
@@ -920,7 +998,7 @@ function attachEventListeners() {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             sessionStorage.removeItem('isLoggedIn');
-            window.location.reload();
+            window.location.href = 'login';
         });
     }
 }

@@ -1,11 +1,12 @@
 // Global State
-let currentRange = '30days';
+let currentRange = 'today';
 let customStartDate = '';
 let customEndDate = '';
 let performanceView = 'daily'; // daily, weekly, monthly
 let productSortBy = 'transactions'; // transactions, revenue, profit
 let feedPage = 1;
 let feedAutoRefreshInterval = null;
+let tableAutoRefreshInterval = null;
 let activeAlerts = [];
 
 // Table State
@@ -48,8 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check session login state
     const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
     if (!isLoggedIn) {
-        // Redirect to dashboard login
-        window.location.href = 'dashboard';
+        // Redirect to login
+        window.location.href = 'login';
         return;
     }
     
@@ -189,16 +190,19 @@ function initEventListeners() {
 
     // Table Controls
     document.getElementById('table-search').addEventListener('input', debounce(() => {
+        tableSearchQuery = document.getElementById('table-search').value.trim();
         tablePage = 1;
         fetchTableData();
     }, 400));
 
     document.getElementById('table-status-filter').addEventListener('change', () => {
+        tableStatusFilter = document.getElementById('table-status-filter').value;
         tablePage = 1;
         fetchTableData();
     });
 
     document.getElementById('table-product-filter').addEventListener('change', () => {
+        tableProductFilter = document.getElementById('table-product-filter').value;
         tablePage = 1;
         fetchTableData();
     });
@@ -244,8 +248,45 @@ function initEventListeners() {
     document.getElementById('nav-logout').addEventListener('click', (e) => {
         e.preventDefault();
         sessionStorage.removeItem('isLoggedIn');
-        window.location.reload();
+        window.location.href = 'login';
     });
+
+    // Analytics Table Refresh
+    document.getElementById('btn-refresh-analytics-table')?.addEventListener('click', () => {
+        tablePage = 1;
+        fetchTableData();
+    });
+
+    // Analytics Table Reset
+    document.getElementById('btn-reset-analytics-table')?.addEventListener('click', () => {
+        document.getElementById('table-search').value = '';
+        document.getElementById('table-product-filter').value = 'all';
+        document.getElementById('table-status-filter').value = 'all';
+        document.getElementById('table-limit-filter').value = '10';
+        tableSearchQuery = '';
+        tableStatusFilter = 'all';
+        tableProductFilter = 'all';
+        tableLimit = 10;
+        tablePage = 1;
+        fetchTableData();
+    });
+
+    // Table Auto Refresh
+    const tableAutoRefreshToggle = document.getElementById('auto-refresh-toggle');
+    if (tableAutoRefreshToggle) {
+        tableAutoRefreshToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                tableAutoRefreshInterval = setInterval(() => {
+                    fetchTableData();
+                }, 10000);
+            } else {
+                if (tableAutoRefreshInterval) {
+                    clearInterval(tableAutoRefreshInterval);
+                    tableAutoRefreshInterval = null;
+                }
+            }
+        });
+    }
 }
 
 // Refresh Page Data
@@ -1287,7 +1328,7 @@ function renderTableRows() {
         } else if (item.status === 40 || item.status === 50) {
             statusBadge = `<span class="badge status-failed"><i class="fa-solid fa-circle-xmark"></i> Failed</span>`;
         } else if (item.status === 55) {
-            statusBadge = `<span class="badge status-pending"><i class="fa-solid fa-rotate-left"></i> Refunded</span>`;
+            statusBadge = `<span class="badge status-pending"><i class="fa-solid fa-clock"></i> Timeout</span>`;
         }
 
         const row = document.createElement('tr');

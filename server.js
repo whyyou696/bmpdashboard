@@ -36,10 +36,16 @@ app.get("/transactions", async (req, res) => {
         let conditions = [];
 
         if (status !== "all") {
-            const statusInt = parseInt(status);
-            if (!isNaN(statusInt)) {
-                conditions.push("status = @status");
-                request.input("status", sql.Int, statusInt);
+            if (status === "suspect") {
+                conditions.push("status NOT IN (40, 50, 52) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND')");
+            } else if (status === "40") {
+                conditions.push("status IN (40, 52)");
+            } else {
+                const statusInt = parseInt(status);
+                if (!isNaN(statusInt)) {
+                    conditions.push("status = @status");
+                    request.input("status", sql.Int, statusInt);
+                }
             }
         }
 
@@ -169,9 +175,11 @@ app.get("/transactions/stats", async (req, res) => {
         const result = await request.query(`
             SELECT 
                 COUNT(*) as total,
-                SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as successCount,
-                SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END) as failedCount,
-                SUM(CASE WHEN status NOT IN (20, 40) THEN 1 ELSE 0 END) as pendingCount,
+                SUM(CASE WHEN status = 20 AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as successCount,
+                SUM(CASE WHEN status = 40 OR status = 52 THEN 1 ELSE 0 END) as failedCount,
+                SUM(CASE WHEN status = 50 THEN 1 ELSE 0 END) as canceledCount,
+                SUM(CASE WHEN status NOT IN (40, 50, 52) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') THEN 1 ELSE 0 END) as suspectCount,
+                SUM(CASE WHEN status NOT IN (20, 40, 50, 52) AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as pendingCount,
                 SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga, 0) AS BIGINT) ELSE 0 END) as totalRetail,
                 SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga_beli, 0) AS BIGINT) ELSE 0 END) as totalCost,
                 SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as totalProfit
@@ -185,6 +193,8 @@ app.get("/transactions/stats", async (req, res) => {
             total: stats.total || 0,
             successCount: stats.successCount || 0,
             failedCount: stats.failedCount || 0,
+            canceledCount: stats.canceledCount || 0,
+            suspectCount: stats.suspectCount || 0,
             pendingCount: stats.pendingCount || 0,
             successRate: parseFloat(successRate),
             totalRetail: stats.totalRetail || 0,
@@ -211,7 +221,7 @@ app.get("/transactions/chart", async (req, res) => {
                     DATEPART(hour, tgl_entri) as label,
                     COUNT(*) as total,
                     SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as success,
-                    SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END) as failed,
+                    SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END) as failed,
                     SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as profit
                 FROM transaksi
                 WHERE CONVERT(date, tgl_entri) = @date
@@ -224,7 +234,7 @@ app.get("/transactions/chart", async (req, res) => {
                     CONVERT(date, tgl_entri) as label,
                     COUNT(*) as total,
                     SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as success,
-                    SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END) as failed,
+                    SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END) as failed,
                     SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as profit
                 FROM transaksi
                 WHERE tgl_entri >= DATEADD(day, -7, GETDATE())
@@ -941,6 +951,79 @@ app.get("/api/analytics/export", async (req, res) => {
     }
 });
 
+// GET /api/system-logs
+app.get("/api/system-logs", async (req, res) => {
+    try {
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        let conditions = [];
+        const tipe = req.query.tipe; // 'all', '1', '2', '3'
+        const limit = parseInt(req.query.limit) || 100;
+        const search = req.query.search || "";
+        const startDate = req.query.startDate;
+        const endDate = req.query.endDate;
+        
+        if (tipe && tipe !== "all") {
+            const tipeInt = parseInt(tipe);
+            if (!isNaN(tipeInt)) {
+                conditions.push("tipe = @tipe");
+                request.input("tipe", sql.TinyInt, tipeInt);
+            }
+        }
+        
+        if (search) {
+            conditions.push("pesan LIKE @search");
+            request.input("search", sql.VarChar, `%${search}%`);
+        }
+        
+        if (startDate) {
+            conditions.push("CONVERT(date, waktu) >= @startDate");
+            request.input("startDate", sql.VarChar, startDate);
+        }
+        
+        if (endDate) {
+            conditions.push("CONVERT(date, waktu) <= @endDate");
+            request.input("endDate", sql.VarChar, endDate);
+        }
+        
+        const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+        
+        const query = `
+            SELECT TOP (@limit) kode, waktu, tipe, pesan 
+            FROM sistem_log
+            ${whereClause}
+            ORDER BY waktu DESC
+        `;
+        request.input("limit", sql.Int, limit);
+        
+        const result = await request.query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.warn("API SQL query failed for system-logs, falling back to simulated data. Error:", err.message);
+        // Simulated system logs corresponding to the desktop screenshot
+        const fallbackLogs = [
+            { kode: 1, waktu: new Date().toISOString(), tipe: 3, pesan: "TrxID #1856813: Modul IP: DIGIPOS AUTO 1 Produk TDEKS10, harga beli naik dari 47350 ke 47800" },
+            { kode: 2, waktu: new Date(Date.now() - 60000).toISOString(), tipe: 3, pesan: "Tidak ada transaksi menunggu jawaban: IP: 188.166.178.169: report/?t=143533&message=Pengisian Voucher OTCredits Rp. 500.315 pada 08/06 08.28.12 sudah dibatalkan (kadaluarsa). Silakan request ulang pengisian OTCredits Anda." },
+            { kode: 3, waktu: new Date(Date.now() - 120000).toISOString(), tipe: 3, pesan: "Administrator update status #1856812 - TDNP37.081228833967: Menunggu Jawaban -> Alihkan (IP: DIGIPOS CEK)" },
+            { kode: 4, waktu: new Date(Date.now() - 180000).toISOString(), tipe: 3, pesan: "TrxID #1856835: Modul IP: DIGIPOS AUTO 1 Produk TDNP57, harga beli naik dari 15850 ke 15898" },
+            { kode: 5, waktu: new Date(Date.now() - 240000).toISOString(), tipe: 2, pesan: "Best Multipayment ID has successfully logged in." },
+            { kode: 6, waktu: new Date(Date.now() - 300000).toISOString(), tipe: 2, pesan: "119360256915212 dimasukkan ke daftar hitam. Alasan: gagal sebanyak 3 kali atau lebih." },
+            { kode: 7, waktu: new Date(Date.now() - 360000).toISOString(), tipe: 3, pesan: "Tidak ada transaksi menunggu jawaban: IP: 118.99.85.170: report/?serverid=322978125&clientid=1856362&statuscode=2&kp=SDNP5HR3&msisdn=081351579246&sn=-&msg=Trx SDNP5HR3 ke 081351579246 GAGAL. mohon diperiksa kembali No tujuan sebelum di ulang. Saldo: Rp 18.773.884. 08/06/2026" },
+            { kode: 8, waktu: new Date(Date.now() - 420000).toISOString(), tipe: 3, pesan: "Administrator update status #1856827 - TDEKS10.082393732382: Menunggu Jawaban -> Alihkan (IP: DIGIPOS CEK)" },
+            { kode: 9, waktu: new Date(Date.now() - 480000).toISOString(), tipe: 3, pesan: "Administrator update status #1856838 - TDV9.085337877451: Menunggu Jawaban -> Alihkan (IP: DIGIPOS CEK)" },
+            { kode: 10, waktu: new Date(Date.now() - 540000).toISOString(), tipe: 3, pesan: "TrxID #1856870: Modul IP: KAWAN SEJAGAT Produk TRP10, harga beli naik dari 10100 ke 10131" },
+            { kode: 11, waktu: new Date(Date.now() - 600000).toISOString(), tipe: 2, pesan: "Administrator has successfully logged in." },
+            { kode: 12, waktu: new Date(Date.now() - 660000).toISOString(), tipe: 2, pesan: "ayu has successfully logged in." },
+            { kode: 13, waktu: new Date(Date.now() - 720000).toISOString(), tipe: 3, pesan: "TrxID #1856886: Modul IP: DIGIPOS AUTO 1 Produk TM57, harga beli naik dari 15500 ke 15850" },
+            { kode: 14, waktu: new Date(Date.now() - 780000).toISOString(), tipe: 3, pesan: "AplEvent: InvalidOperationException: Timeout expired. The timeout period elapsed prior to obtaining a connection from the pool. This may have occurred because all pooled connections were in use and max pool size was reached." },
+            { kode: 15, waktu: new Date(Date.now() - 840000).toISOString(), tipe: 2, pesan: "AplSesiUpdate: SqlException: A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that the instance name is correct and that SQL Server is configured to allow remote connections. (provider: Named Pipes Provider, error: 40 - Could not open a connection to SQL Server)" },
+            { kode: 16, waktu: new Date(Date.now() - 900000).toISOString(), tipe: 3, pesan: "Administrator update status #1856869 - TDEKS10.082210304592: Menunggu Jawaban -> Alihkan" }
+        ];
+        res.json(fallbackLogs);
+    }
+});
+
 // Root Page Redirects
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
@@ -948,6 +1031,10 @@ app.get("/", (req, res) => {
 
 app.get("/dashboard", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
+});
+
+app.get("/login", (req, res) => {
+    res.sendFile(path.join(__dirname, "login.html"));
 });
 
 app.get("/analytics", (req, res) => {
@@ -1017,6 +1104,7 @@ app.get("/api/inbox", async (req, res) => {
         const serviceCenter = req.query.serviceCenter || "";
         const startDate = req.query.startDate || "";
         const endDate = req.query.endDate || "";
+        const msgType = req.query.msgType || "";
 
         const pool = await sql.connect(config);
         const request = pool.request();
@@ -1050,8 +1138,15 @@ app.get("/api/inbox", async (req, res) => {
 
         if (startDate && endDate) {
             conditions.push("i.tgl_entri >= @startDate AND i.tgl_entri <= @endDate");
-            request.input("startDate", sql.DateTime2, new Date(startDate));
-            request.input("endDate", sql.DateTime2, new Date(endDate + 'T23:59:59.999'));
+            
+            const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+            const start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
+
+            const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+            const end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+
+            request.input("startDate", sql.DateTime2, start);
+            request.input("endDate", sql.DateTime2, end);
         }
 
         // Status filter translation
@@ -1066,6 +1161,14 @@ app.get("/api/inbox", async (req, res) => {
                 conditions.push("(t.status IN (0, 2))");
             } else if (status === 'Pending') {
                 conditions.push("((t.status NOT IN (20, 40, 50, 52, 55, 0, 2) OR t.status IS NULL) AND i.status NOT IN (20, 40, 46))");
+            }
+        }
+
+        if (msgType) {
+            if (msgType === "reseller") {
+                conditions.push("i.is_jawaban = 0");
+            } else if (msgType === "provider") {
+                conditions.push("i.is_jawaban = 1");
             }
         }
 
@@ -1099,9 +1202,9 @@ app.get("/api/inbox", async (req, res) => {
         // Sort params
         const sortCol = req.query.sortCol || "created_at";
         const sortDir = req.query.sortDir === "asc" ? "ASC" : "DESC";
-        let sqlSort = "i.tgl_entri DESC";
-        if (sortCol === "transaction_id") sqlSort = `i.kode_transaksi ${sortDir}`;
-        else if (sortCol === "created_at") sqlSort = `i.tgl_entri ${sortDir}`;
+        let sqlSort = "i.kode DESC";
+        if (sortCol === "inbox_id" || sortCol === "transaction_id") sqlSort = `i.kode ${sortDir}`;
+        else if (sortCol === "created_at") sqlSort = `i.kode ${sortDir}`;
         else if (sortCol === "reseller_code") sqlSort = `i.kode_reseller ${sortDir}`;
         else if (sortCol === "reseller_name") sqlSort = `r.nama ${sortDir}`;
         else if (sortCol === "product_code") sqlSort = `t.kode_produk ${sortDir}`;
@@ -1171,12 +1274,89 @@ app.get("/api/inbox", async (req, res) => {
 // GET /api/inbox/statistics (KPI values for today)
 app.get("/api/inbox/statistics", async (req, res) => {
     try {
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+        const search = req.query.search || "";
+        const reseller = req.query.reseller || "";
+        const product = req.query.product || "";
+        const status = req.query.status || "";
+        const terminal = req.query.terminal || "";
+        const serviceCenter = req.query.serviceCenter || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
+        const msgType = req.query.msgType || "";
 
         const pool = await sql.connect(config);
         const request = pool.request();
-        request.input("todayStart", sql.DateTime2, todayStart);
+
+        let conditions = [];
+
+        if (search) {
+            conditions.push("(i.pengirim LIKE @search OR i.pesan LIKE @search OR i.kode_reseller LIKE @search OR r.nama LIKE @search OR t.kode_produk LIKE @search OR t.tujuan LIKE @search OR t.ref_id LIKE @search OR CAST(i.kode_transaksi AS VARCHAR) LIKE @search)");
+            request.input("search", sql.VarChar, `%${search}%`);
+        }
+
+        if (reseller) {
+            conditions.push("i.kode_reseller = @reseller");
+            request.input("reseller", sql.VarChar, reseller);
+        }
+
+        if (product) {
+            conditions.push("t.kode_produk = @product");
+            request.input("product", sql.VarChar, product);
+        }
+
+        if (terminal) {
+            conditions.push("i.kode_terminal = @terminal");
+            request.input("terminal", sql.Int, parseInt(terminal));
+        }
+
+        if (serviceCenter) {
+            conditions.push("i.service_center = @serviceCenter");
+            request.input("serviceCenter", sql.VarChar, serviceCenter);
+        }
+
+        let start, end;
+        if (startDate && endDate) {
+            const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+            start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
+
+            const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+            end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+        } else {
+            // Default to today
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = today.getMonth();
+            const d = today.getDate();
+            start = new Date(y, m, d, 0, 0, 0, 0);
+            end = new Date(y, m, d, 23, 59, 59, 999);
+        }
+        conditions.push("i.tgl_entri >= @startDate AND i.tgl_entri <= @endDate");
+        request.input("startDate", sql.DateTime2, start);
+        request.input("endDate", sql.DateTime2, end);
+
+        if (status) {
+            if (status === 'Success') {
+                conditions.push("(t.status = 20 OR (t.status IS NULL AND i.status = 20))");
+            } else if (status === 'Duplicate Transaction') {
+                conditions.push("(t.status = 52 OR (t.status IS NULL AND i.status = 46))");
+            } else if (status === 'Failed') {
+                conditions.push("(t.status IN (40, 50, 55) OR (t.status IS NULL AND i.status = 40))");
+            } else if (status === 'Processing') {
+                conditions.push("(t.status IN (0, 2))");
+            } else if (status === 'Pending') {
+                conditions.push("((t.status NOT IN (20, 40, 50, 52, 55, 0, 2) OR t.status IS NULL) AND i.status NOT IN (20, 40, 46))");
+            }
+        }
+
+        if (msgType) {
+            if (msgType === "reseller") {
+                conditions.push("i.is_jawaban = 0");
+            } else if (msgType === "provider") {
+                conditions.push("i.is_jawaban = 1");
+            }
+        }
+
+        const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
         const query = `
             SELECT
@@ -1187,7 +1367,8 @@ app.get("/api/inbox/statistics", async (req, res) => {
                 SUM(CASE WHEN t.status IS NULL AND i.status NOT IN (20, 40, 46) THEN 1 ELSE 0 END) as pendingTxs
             FROM inbox i
             LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
-            WHERE i.tgl_entri >= @todayStart
+            LEFT JOIN reseller r ON i.kode_reseller = r.kode
+            ${whereClause}
         `;
 
         const result = await request.query(query);

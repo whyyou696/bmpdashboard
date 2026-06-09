@@ -28,6 +28,10 @@ const statSuccessVal = document.getElementById('stat-success-val');
 const statSuccessPct = document.getElementById('stat-success-pct');
 const statFailedVal = document.getElementById('stat-failed-val');
 const statFailedPct = document.getElementById('stat-failed-pct');
+const statCanceledVal = document.getElementById('stat-canceled-val');
+const statCanceledPct = document.getElementById('stat-canceled-pct');
+const statSuspectVal = document.getElementById('stat-suspect-val');
+const statSuspectPct = document.getElementById('stat-suspect-pct');
 const statPendingVal = document.getElementById('stat-pending-val');
 
 // Financial Stats Elements
@@ -68,75 +72,48 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Auth & Session DOM elements
-    const loginContainer = document.getElementById('login-container');
-    const appContainer = document.getElementById('app-container');
-    const loginForm = document.getElementById('login-form');
-    const usernameInput = document.getElementById('username');
-    const passwordInput = document.getElementById('password');
-    const errorBox = document.getElementById('error-box');
-    const errorMsg = document.getElementById('error-msg');
-    const btnLogout = document.getElementById('nav-logout');
-    const togglePassword = document.getElementById('toggle-password');
+    // Check session login state
+    const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
+    if (!isLoggedIn) {
+        window.location.href = 'login';
+        return;
+    }
 
-    // Toggle Password Visibility
-    if (togglePassword && passwordInput) {
-        togglePassword.addEventListener('click', () => {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            togglePassword.classList.toggle('fa-eye');
-            togglePassword.classList.toggle('fa-eye-slash');
-        });
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+        appContainer.style.display = 'flex';
     }
 
     updateTime();
     setInterval(updateTime, 1000);
 
-    // Check session login state
-    const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
-    if (isLoggedIn) {
-        appContainer.style.display = 'flex';
-        fetchData();
-    } else {
-        loginContainer.style.display = 'flex';
-    }
+    fetchData();
 
-    // Login Form Submission
-    if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const username = usernameInput.value.trim();
-            const password = passwordInput.value;
-
-            if (username === 'adm01' && password === 'admpas01') {
-                errorBox.style.display = 'none';
-                sessionStorage.setItem('isLoggedIn', 'true');
-
-                // Fade out animation
-                loginContainer.style.animation = 'fadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
-                setTimeout(() => {
-                    loginContainer.style.display = 'none';
-                    appContainer.style.display = 'flex';
-                    fetchData();
-                }, 300);
+    // Auto Refresh Toggler
+    let autoRefreshInterval = null;
+    const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
+    if (autoRefreshToggle) {
+        autoRefreshToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                autoRefreshInterval = setInterval(() => {
+                    fetchData(false); // fetch table data only, no heavy stats animations
+                }, 10000);
             } else {
-                errorBox.style.display = 'flex';
-                errorMsg.textContent = 'Username atau password salah!';
-
-                // Re-trigger shake animation
-                errorBox.style.animation = 'none';
-                void errorBox.offsetWidth; // trigger reflow
-                errorBox.style.animation = 'shake 0.4s ease';
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
             }
         });
     }
 
     // Logout Action
+    const btnLogout = document.getElementById('nav-logout');
     if (btnLogout) {
         btnLogout.addEventListener('click', (e) => {
             e.preventDefault();
             sessionStorage.removeItem('isLoggedIn');
-            window.location.reload();
+            window.location.href = 'login';
         });
     }
 
@@ -196,6 +173,28 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         fetchData(true);
     });
+
+    const btnRefreshDash = document.getElementById('btn-refresh-dash');
+    if (btnRefreshDash) {
+        btnRefreshDash.addEventListener('click', () => {
+            currentPage = 1;
+            fetchData(true);
+        });
+    }
+
+    const btnResetDash = document.getElementById('btn-reset-dash');
+    if (btnResetDash) {
+        btnResetDash.addEventListener('click', () => {
+            searchInput.value = '';
+            statusFilter.value = 'all';
+            dateFilter.value = '';
+            limitFilter.value = '5';
+            rowsPerPage = 5;
+            btnClearDate.style.display = 'none';
+            currentPage = 1;
+            fetchData(true);
+        });
+    }
 });
 
 // Update Real-time Clock widget
@@ -270,6 +269,8 @@ async function fetchStats(dateVal = '') {
         animateValue(statTotalVal, stats.total);
         animateValue(statSuccessVal, stats.successCount);
         animateValue(statFailedVal, stats.failedCount);
+        animateValue(statCanceledVal, stats.canceledCount);
+        animateValue(statSuspectVal, stats.suspectCount);
         animateValue(statPendingVal, stats.pendingCount);
 
         // Populate financial stats
@@ -280,7 +281,13 @@ async function fetchStats(dateVal = '') {
         statSuccessPct.textContent = `${stats.successRate}% Success rate`;
 
         const failedPct = stats.total > 0 ? ((stats.failedCount / stats.total) * 100).toFixed(1) : 0;
-        statFailedPct.textContent = `${failedPct}% Failed/Canceled`;
+        statFailedPct.textContent = `${failedPct}% Failed`;
+
+        const canceledPct = stats.total > 0 ? ((stats.canceledCount / stats.total) * 100).toFixed(1) : 0;
+        statCanceledPct.textContent = `${canceledPct}% Canceled`;
+
+        const suspectPct = stats.total > 0 ? ((stats.suspectCount / stats.total) * 100).toFixed(1) : 0;
+        statSuspectPct.textContent = `${suspectPct}% Suspect`;
     } catch (error) {
         console.error('Failed to fetch stats:', error);
     }
@@ -581,16 +588,22 @@ function formatDateTime(dateString) {
     });
 }
 
-// Render status badge
-function getStatusBadge(status) {
-    if (status === 20) {
+function getStatusBadge(status, sn) {
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'];
+    const isSuspectSn = sn && suspectSns.includes(sn.toUpperCase().trim());
+
+    if (status === 52) {
+        return '<span class="badge status-failed"><i class="fa-solid fa-circle-xmark"></i> Tujuan Salah</span>';
+    } else if (isSuspectSn && status !== 40 && status !== 50) {
+        return '<span class="badge status-suspect"><i class="fa-solid fa-triangle-exclamation"></i> Suspect</span>';
+    } else if (status === 20) {
         return '<span class="badge status-success"><i class="fa-solid fa-circle-check"></i> Success</span>';
     } else if (status === 40) {
         return '<span class="badge status-failed"><i class="fa-solid fa-circle-xmark"></i> Failed</span>';
     } else if (status === 50) {
         return '<span class="badge status-failed"><i class="fa-solid fa-ban"></i> Canceled</span>';
     } else if (status === 55) {
-        return '<span class="badge status-pending"><i class="fa-solid fa-rotate-left"></i> Refunded</span>';
+        return '<span class="badge status-pending"><i class="fa-solid fa-clock"></i> Timeout</span>';
     } else {
         return `<span class="badge status-pending"><i class="fa-solid fa-clock"></i> Code ${status}</span>`;
     }
@@ -628,7 +641,7 @@ function renderTable(transactions) {
             <td class="text-right" style="color: var(--text-secondary);">${formatCurrency(item.harga_beli)}</td>
             <td class="text-right ${profitClass}" style="font-weight: 600;">${formatCurrency(profit)}</td>
             <td style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary);">${item.sn || '<span class="text-muted">-</span>'}</td>
-            <td>${getStatusBadge(item.status)}</td>
+            <td>${getStatusBadge(item.status, item.sn)}</td>
         `;
         tableBody.appendChild(row);
     });

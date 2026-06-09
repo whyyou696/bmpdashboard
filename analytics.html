@@ -177,10 +177,10 @@
                 <div class="flex items-center gap-2">
                     <label for="filter-date-range" class="text-xs font-bold text-slate-400 uppercase tracking-wider">Date Range</label>
                     <select id="filter-date-range" class="px-4 py-2 text-xs font-semibold rounded-full border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] outline-none cursor-pointer hover:border-brandBlue transition-all shadow-sm duration-200">
-                        <option value="today">Today</option>
+                        <option value="today" selected>Today</option>
                         <option value="yesterday">Yesterday</option>
                         <option value="7days">Last 7 Days</option>
-                        <option value="30days" selected>Last 30 Days</option>
+                        <option value="30days">Last 30 Days</option>
                         <option value="thismonth">This Month</option>
                         <option value="lastmonth">Last Month</option>
                         <option value="custom">Custom Range</option>
@@ -525,7 +525,7 @@
                             <option value="20">Success (20)</option>
                             <option value="40">Failed (40)</option>
                             <option value="50">Canceled (50)</option>
-                            <option value="55">Refunded (55)</option>
+                            <option value="55">Timeout (55)</option>
                         </select>
 
                         <!-- Limit Filter -->
@@ -534,6 +534,22 @@
                             <option value="25">25 Rows</option>
                             <option value="50">50 Rows</option>
                         </select>
+
+                        <!-- Auto Refresh Switch -->
+                        <div class="switch-container" style="margin-right: 8px;">
+                            <span>Auto Refresh</span>
+                            <label class="switch">
+                                <input type="checkbox" id="auto-refresh-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <!-- Action Buttons -->
+                        <button id="btn-refresh-analytics-table" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm text-slate-700 dark:text-slate-300" title="Refresh Table">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                        </button>
+                        <button id="btn-reset-analytics-table" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm text-slate-700 dark:text-slate-300" title="Reset Filters">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                        </button>
                     </div>
                 </div>
 
@@ -584,6 +600,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom Page Script -->
     <script src="analytics.js"></script>
+    <!-- System Log Widget -->
+    <script src="system-log-widget.js"></script>
 </body>
 
 </html>
