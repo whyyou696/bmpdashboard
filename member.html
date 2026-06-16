@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Multi Payment - Member & Modul</title>
+    <meta name="description" content="Premium real-time supplier balance and module monitoring for Best Multi Payment.">
+    <link rel="icon" type="image/png" href="assets/logo_best.png">
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Animated Background Blobs -->
+    <div class="bg-bubbles">
+        <div class="bubble bubble-1"></div>
+        <div class="bubble bubble-2"></div>
+        <div class="bubble bubble-3"></div>
+    </div>
+    <div class="app-container" id="app-container" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <img src="assets/logo_best.png" alt="Best Multi Payment Logo" class="brand-logo">
+                <div class="logo-text">BMP<span>Dashboard</span></div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard" class="nav-item" id="nav-dashboard">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="analytics" class="nav-item" id="nav-analytics">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Analytics</span>
+                </a>
+                <a href="inbox" class="nav-item" id="nav-inbox">
+                    <i class="fa-solid fa-inbox"></i>
+                    <span>Inbox</span>
+                </a>
+                <a href="modul" class="nav-item" id="nav-modul">
+                    <i class="fa-solid fa-cubes"></i>
+                    <span>Modul</span>
+                </a>
+                <a href="member" class="nav-item active" id="nav-member">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Member</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-refresh">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Force Sync</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-logout" style="margin-top: auto; color: var(--failed);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator online"></div>
+                <span>Connected to DB</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1 id="main-heading">Member Monitor</h1>
+                    <p class="subtitle">Analyze supplier balances and routing statistics</p>
+                </div>
+                <div class="header-actions" style="display: flex; gap: 12px; align-items: center;">
+                    <button id="theme-toggle" class="time-widget"
+                        style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border-color); outline: none; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0;"
+                        title="Toggle Dark Mode">
+                        <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+                    </button>
+                    <div class="time-widget">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="current-time">Loading time...</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- KPI Stats Grid -->
+            <section class="stats-grid" aria-label="Key Performance Indicators">
+                <!-- Stat Card: Total Saldo Supplier -->
+                <div class="stat-card" id="card-total-saldo">
+                    <div class="stat-icon-wrapper total">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Saldo Supplier</span>
+                        <h2 class="stat-value text-indigo" id="stat-total-saldo-val">-</h2>
+                        <span class="stat-meta">Across all active modules</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Potensial Aktif -->
+                <div class="stat-card" id="card-potential-active">
+                    <div class="stat-icon-wrapper success">
+                        <i class="fa-solid fa-toggle-on"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Potensial Aktif</span>
+                        <h2 class="stat-value text-success" id="stat-potential-active-val">-</h2>
+                        <span class="stat-meta" id="stat-potential-active-meta">Potential active suppliers</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Non Potensial -->
+                <div class="stat-card" id="card-non-potential">
+                    <div class="stat-icon-wrapper failed">
+                        <i class="fa-solid fa-toggle-off"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Non Potensial</span>
+                        <h2 class="stat-value" id="stat-non-potential-val">-</h2>
+                        <span class="stat-meta" id="stat-non-potential-meta">Non-potential suppliers</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: 30-Day Trx Count -->
+                <div class="stat-card" id="card-trx-30d">
+                    <div class="stat-icon-wrapper suspect">
+                        <i class="fa-solid fa-receipt"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Transactions (30d)</span>
+                        <h2 class="stat-value" id="stat-trx-30d-val">-</h2>
+                        <span class="stat-meta">Processed via modules</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Filters and Data Table -->
+            <section class="table-section" aria-label="Module Records">
+                <!-- Table Controls Header -->
+                <div class="table-controls">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search by name, code, endpoint..."
+                            aria-label="Search modules">
+                    </div>
+
+                    <div class="filter-actions">
+                        <div class="select-wrapper">
+                            <i class="fa-solid fa-filter select-icon"></i>
+                            <select id="status-filter" aria-label="Filter by Status">
+                                <option value="all">All Statuses</option>
+                                <option value="active">Active (Aktif)</option>
+                                <option value="inactive">Inactive (Non Aktif)</option>
+                            </select>
+                        </div>
+                        <div class="select-wrapper">
+                            <i class="fa-solid fa-list select-icon"></i>
+                            <select id="limit-filter" aria-label="Rows per page">
+                                <option value="5">5 Rows</option>
+                                <option value="10" selected>10 Rows</option>
+                                <option value="20">20 Rows</option>
+                            </select>
+                        </div>
+                        <button id="btn-refresh-dash" class="btn-refresh-dash" title="Refresh Data">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                        </button>
+                        <button id="btn-reset-dash" class="btn-reset-dash" title="Reset Filters">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Data Table -->
+                <div class="table-container">
+                    <table id="modules-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Kode</th>
+                                <th scope="col">Modul Name</th>
+                                <th scope="col">Tujuan / Endpoint</th>
+                                <th scope="col" class="text-right">Saldo Supplier</th>
+                                <th scope="col" class="text-right">Total Trx (30d)</th>
+                                <th scope="col" class="text-right">Success Rate</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <tr class="placeholder-row">
+                                <td colspan="7">
+                                    <div class="table-loader-wrapper">
+                                        <div class="spinner"></div>
+                                        <span>Fetching modules...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Pagination Footer -->
+                <footer class="table-footer">
+                    <div class="pagination-info" id="pagination-info">
+                        Showing 0 to 0 of 0 modules
+                    </div>
+                    <nav class="pagination-controls" aria-label="Pagination Navigation">
+                        <button class="btn-pagination" id="btn-prev" disabled>
+                            <i class="fa-solid fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="page-numbers" id="page-numbers">
+                            <!-- Page buttons injected dynamically -->
+                        </div>
+                        <button class="btn-pagination" id="btn-next" disabled>
+                            Next <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </nav>
+                </footer>
+            </section>
+        </main>
+    </div>
+
+    <!-- Script file -->
+    <script src="member.js"></script>
+    <!-- System Log Widget -->
+    <script src="system-log-widget.js"></script>
+</body>
+
+</html>

@@ -32,6 +32,8 @@ const statCanceledVal = document.getElementById('stat-canceled-val');
 const statCanceledPct = document.getElementById('stat-canceled-pct');
 const statSuspectVal = document.getElementById('stat-suspect-val');
 const statSuspectPct = document.getElementById('stat-suspect-pct');
+const statWrongNumberVal = document.getElementById('stat-wrong-number-val');
+const statWrongNumberPct = document.getElementById('stat-wrong-number-pct');
 const statPendingVal = document.getElementById('stat-pending-val');
 
 // Financial Stats Elements
@@ -271,6 +273,7 @@ async function fetchStats(dateVal = '') {
         animateValue(statFailedVal, stats.failedCount);
         animateValue(statCanceledVal, stats.canceledCount);
         animateValue(statSuspectVal, stats.suspectCount);
+        if (statWrongNumberVal) animateValue(statWrongNumberVal, stats.wrongNumberCount);
         animateValue(statPendingVal, stats.pendingCount);
 
         // Populate financial stats
@@ -278,16 +281,27 @@ async function fetchStats(dateVal = '') {
         animateValue(statCostVal, stats.totalCost, true);
         animateValue(statProfitVal, stats.totalProfit, true);
 
-        statSuccessPct.textContent = `${stats.successRate}% Success rate`;
+        if (statSuccessPct) statSuccessPct.textContent = `${stats.successRate}% Success rate`;
 
-        const failedPct = stats.total > 0 ? ((stats.failedCount / stats.total) * 100).toFixed(1) : 0;
-        statFailedPct.textContent = `${failedPct}% Failed`;
+        if (statFailedPct) {
+            const failedPct = stats.total > 0 ? ((stats.failedCount / stats.total) * 100).toFixed(1) : 0;
+            statFailedPct.textContent = `${failedPct}% Failed`;
+        }
 
-        const canceledPct = stats.total > 0 ? ((stats.canceledCount / stats.total) * 100).toFixed(1) : 0;
-        statCanceledPct.textContent = `${canceledPct}% Canceled`;
+        if (statCanceledPct) {
+            const canceledPct = stats.total > 0 ? ((stats.canceledCount / stats.total) * 100).toFixed(1) : 0;
+            statCanceledPct.textContent = `${canceledPct}% Canceled`;
+        }
 
-        const suspectPct = stats.total > 0 ? ((stats.suspectCount / stats.total) * 100).toFixed(1) : 0;
-        statSuspectPct.textContent = `${suspectPct}% Suspect`;
+        if (statSuspectPct) {
+            const suspectPct = stats.total > 0 ? ((stats.suspectCount / stats.total) * 100).toFixed(1) : 0;
+            statSuspectPct.textContent = `${suspectPct}% Suspect`;
+        }
+
+        if (statWrongNumberPct) {
+            const wrongNumberPct = stats.total > 0 ? ((stats.wrongNumberCount / stats.total) * 100).toFixed(1) : 0;
+            statWrongNumberPct.textContent = `${wrongNumberPct}% Wrong Number`;
+        }
     } catch (error) {
         console.error('Failed to fetch stats:', error);
     }
@@ -592,7 +606,7 @@ function getStatusBadge(status, sn) {
     const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'];
     const isSuspectSn = sn && suspectSns.includes(sn.toUpperCase().trim());
 
-    if (status === 52) {
+    if (status === 52 || status === 54) {
         return '<span class="badge status-failed"><i class="fa-solid fa-circle-xmark"></i> Tujuan Salah</span>';
     } else if (isSuspectSn && status !== 40 && status !== 50) {
         return '<span class="badge status-suspect"><i class="fa-solid fa-triangle-exclamation"></i> Suspect</span>';

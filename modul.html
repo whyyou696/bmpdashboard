@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Multi Payment - Modul Productivity</title>
+    <!-- Google Fonts for Premium Look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Extra filters adjustments for responsive layout */
+        .modul-filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px 0;
+            border-top: 1px dashed var(--border-color);
+        }
+        /* Premium Custom Toggle Switch */
+        .premium-switch {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            transition: var(--transition);
+            user-select: none;
+            height: 38px;
+            box-sizing: border-box;
+        }
+        .dark .premium-switch {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .premium-switch:hover {
+            background: var(--bg-secondary);
+            border-color: var(--vivid-blue);
+            color: var(--text-primary);
+        }
+        .premium-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .premium-switch-slider {
+            position: relative;
+            width: 34px;
+            height: 18px;
+            background-color: var(--border-color);
+            transition: .3s;
+            border-radius: 18px;
+            display: inline-block;
+        }
+        .premium-switch-slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #ffffff;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .premium-switch input:checked + .premium-switch-slider {
+            background-color: var(--vivid-blue);
+        }
+        .premium-switch input:checked + .premium-switch-slider:before {
+            transform: translateX(16px);
+        }
+        .date-filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-filter-group span {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .date-input-field {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 20px;
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .date-input-field:focus {
+            border-color: var(--vivid-blue);
+        }
+        .dark .date-input-field::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.8;
+        }
+
+        /* Performer List Premium Styling */
+        .top-list-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-grow: 1;
+            margin-top: 8px;
+            width: 100%;
+        }
+        .top-list-item {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-sizing: border-box;
+            width: 100%;
+            cursor: default;
+        }
+        .top-list-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--vivid-blue);
+            background: var(--bg-secondary);
+            box-shadow: 0 4px 12px rgba(0, 82, 255, 0.06);
+        }
+        .top-list-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-right: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            flex-shrink: 0;
+        }
+        .rank-badge.rank-1 {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            border: 1px solid #f59e0b;
+        }
+        .rank-badge.rank-2 {
+            background: linear-gradient(135deg, #cbd5e1, #64748b);
+            border: 1px solid #94a3b8;
+        }
+        .rank-badge.rank-3 {
+            background: linear-gradient(135deg, #ca8a04, #854d0e);
+            border: 1px solid #a16207;
+        }
+        .rank-badge.rank-other {
+            background: rgba(148, 163, 184, 0.1);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            box-shadow: none;
+        }
+        .rate-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 10px;
+            font-family: monospace;
+            flex-shrink: 0;
+        }
+        .rate-pill.rate-high {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+        }
+        .rate-pill.rate-med {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+        }
+        .rate-pill.rate-low {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--failed);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+        }
+        .top-list-progress-bg {
+            width: 100%;
+            height: 3px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .top-list-progress-bar {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--vivid-blue), #818cf8);
+            transition: width 0.6s ease;
+        }
+        
+        /* Small Table Styling for Fit */
+        #modules-table {
+            width: 100% !important;
+            min-width: 1000px !important;
+        }
+        #modules-table th {
+            font-size: 0.72rem !important;
+            padding: 10px 12px !important;
+            letter-spacing: 0.3px;
+        }
+        #modules-table td {
+            font-size: 0.76rem !important;
+            padding: 8px 12px !important;
+        }
+        #modules-table .badge {
+            padding: 4px 8px !important;
+            font-size: 0.68rem !important;
+            border-radius: 12px !important;
+        }
+        #modules-table .status-reply-text {
+            font-size: 0.65rem !important;
+            max-width: 160px !important;
+        }
+        /* Top performers hover animation */
+        .top-legend-item {
+            transition: var(--transition) !important;
+            cursor: pointer;
+            padding: 6px 8px !important;
+            border-radius: 6px;
+        }
+        .top-legend-item:hover {
+            transform: translateX(4px);
+            background: rgba(0, 82, 255, 0.04);
+        }
+        .dark .top-legend-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        
+        /* Pagination Panel Spacing & Border */
+        .pagination-panel {
+            padding: 16px 24px !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-top: 1px solid var(--border-color) !important;
+            margin-top: 20px !important;
+            flex-wrap: wrap !important;
+            gap: 16px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Animated Background Blobs -->
+    <div class="bg-bubbles">
+        <div class="bubble bubble-1"></div>
+        <div class="bubble bubble-2"></div>
+        <div class="bubble bubble-3"></div>
+    </div>
+    <div class="app-container" id="app-container" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <img src="assets/logo_best.png" alt="Best Multi Payment Logo" class="brand-logo">
+                <div class="logo-text">BMP<span>Dashboard</span></div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard" class="nav-item" id="nav-dashboard">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="analytics" class="nav-item" id="nav-analytics">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Analytics</span>
+                </a>
+                <a href="inbox" class="nav-item" id="nav-inbox">
+                    <i class="fa-solid fa-inbox"></i>
+                    <span>Inbox</span>
+                </a>
+                <a href="modul" class="nav-item active" id="nav-modul">
+                    <i class="fa-solid fa-cubes"></i>
+                    <span>Modul</span>
+                </a>
+                <a href="member" class="nav-item" id="nav-member">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Member</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-refresh">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Force Sync</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-logout" style="margin-top: auto; color: var(--failed);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator online"></div>
+                <span>Connected to DB</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1 id="main-heading">Modul Monitor</h1>
+                    <p class="subtitle">Analyze provider module transactions and productivity</p>
+                </div>
+                <div class="header-actions" style="display: flex; gap: 12px; align-items: center;">
+                    <button id="theme-toggle" class="time-widget"
+                        style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border-color); outline: none; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0;"
+                        title="Toggle Dark Mode">
+                        <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+                    </button>
+                    <div class="time-widget">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="current-time">Loading time...</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- KPI Stats Grid for Totals -->
+            <section class="stats-grid" aria-label="Module Productivity Totals" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                <!-- Stat Card: Total Omset -->
+                <div class="stat-card" id="card-total-omset">
+                    <div class="stat-icon-wrapper retail">
+                        <i class="fa-solid fa-money-bill-trend-up"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Omset</span>
+                        <h2 class="stat-value text-cyan" id="stat-total-omset-val">-</h2>
+                        <span class="stat-meta">Processed transaction value</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Total Laba -->
+                <div class="stat-card" id="card-total-laba">
+                    <div class="stat-icon-wrapper profit">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Laba (Profit)</span>
+                        <h2 class="stat-value text-success" id="stat-total-laba-val">-</h2>
+                        <span class="stat-meta">Module profit margin</span>
+                    </div>
+                </div>
+
+                <!-- Stat Card: Total Saldo Supplier -->
+                <div class="stat-card" id="card-total-saldo">
+                    <div class="stat-icon-wrapper cost">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Saldo Supplier</span>
+                        <h2 class="stat-value text-indigo" id="stat-total-saldo-val">-</h2>
+                        <span class="stat-meta">Active supplier balance</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grid for Top Lists -->
+            <section class="stats-grid" aria-label="Top Performers Grid" style="margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px;">
+                <!-- Top 5 Modul -->
+                <div class="stat-card" id="card-top-modules" style="flex-direction: column; align-items: stretch; min-width: 380px; padding: 24px; min-height: 320px; box-sizing: border-box; flex: 1;">
+                    <div style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; width: 100%;">
+                        <h3 style="font-weight: 700; font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-cubes text-indigo"></i>
+                            Top 5 Modul
+                        </h3>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 4px 0 0 0;">Transaction share and success rate by module</p>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-grow: 1; flex-wrap: nowrap; width: 100%;">
+                        <div style="position: relative; width: 130px; height: 130px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: auto;">
+                            <canvas id="chart-top-modules" width="130" height="130"></canvas>
+                        </div>
+                        <div id="top-modules-list" class="top-list-content" style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-width: 180px;">
+                            <span class="text-muted" style="font-size: 0.8rem; text-align: center; margin: auto;">Loading module data...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 5 Produk -->
+                <div class="stat-card" id="card-top-products" style="flex-direction: column; align-items: stretch; min-width: 380px; padding: 24px; min-height: 320px; box-sizing: border-box; flex: 1;">
+                    <div style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; width: 100%;">
+                        <h3 style="font-weight: 700; font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-box text-cyan"></i>
+                            Top 5 Produk
+                        </h3>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 4px 0 0 0;">Transaction share and success rate by product</p>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-grow: 1; flex-wrap: nowrap; width: 100%;">
+                        <div style="position: relative; width: 130px; height: 130px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: auto;">
+                            <canvas id="chart-top-products" width="130" height="130"></canvas>
+                        </div>
+                        <div id="top-products-list" class="top-list-content" style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-width: 180px;">
+                            <span class="text-muted" style="font-size: 0.8rem; text-align: center; margin: auto;">Loading product data...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 5 Reseller -->
+                <div class="stat-card" id="card-top-resellers" style="flex-direction: column; align-items: stretch; min-width: 380px; padding: 24px; min-height: 320px; box-sizing: border-box; flex: 1;">
+                    <div style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; width: 100%;">
+                        <h3 style="font-weight: 700; font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-users text-success"></i>
+                            Top 5 Reseller
+                        </h3>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 4px 0 0 0;">Transaction share and success rate by reseller</p>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-grow: 1; flex-wrap: nowrap; width: 100%;">
+                        <div style="position: relative; width: 130px; height: 130px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: auto;">
+                            <canvas id="chart-top-resellers" width="130" height="130"></canvas>
+                        </div>
+                        <div id="top-resellers-list" class="top-list-content" style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-width: 180px;">
+                            <span class="text-muted" style="font-size: 0.8rem; text-align: center; margin: auto;">Loading reseller data...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Filters and Data Table -->
+            <section class="table-section" aria-label="Transaction Records">
+                <!-- Table Controls Header -->
+                <div class="table-controls" style="display: flex; flex-direction: column; align-items: stretch;">
+                    <!-- Row 1: Search & Basic Controls -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; width: 100%;">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="search-input" placeholder="Search by reseller, product, destination, SN, TrxID..."
+                                aria-label="Search transactions">
+                        </div>
+
+                        <div class="filter-actions" style="margin-left: auto;">
+                            <!-- Limit Filter -->
+                            <div class="select-wrapper">
+                                <i class="fa-solid fa-list select-icon"></i>
+                                <select id="limit-filter" aria-label="Rows per page">
+                                    <option value="5">5 Rows</option>
+                                    <option value="10" selected>10 Rows</option>
+                                    <option value="15">15 Rows</option>
+                                    <option value="20">20 Rows</option>
+                                </select>
+                            </div>
+                            <button id="btn-refresh-dash" class="btn-refresh-dash" title="Refresh Data">
+                                <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                            </button>
+                            <button id="btn-reset-dash" class="btn-reset-dash" title="Reset Filters">
+                                <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Detailed Filters (OtomaX Style) -->
+                    <div class="modul-filter-grid">
+                        <!-- Date Start Filter -->
+                        <div class="date-filter-group">
+                            <span style="min-width: 60px;">Tgl Awal:</span>
+                            <input type="date" id="start-date-filter" class="date-input-field" aria-label="Start Date">
+                        </div>
+
+                        <!-- Date End Filter -->
+                        <div class="date-filter-group">
+                            <span style="min-width: 60px;">Tgl Akhir:</span>
+                            <input type="date" id="end-date-filter" class="date-input-field" aria-label="End Date">
+                        </div>
+
+                        <!-- Module Select Filter -->
+                        <div class="select-wrapper" style="width: 100%;">
+                            <i class="fa-solid fa-cubes select-icon"></i>
+                            <select id="modul-filter" aria-label="Filter by Module" style="width: 100%; padding-left: 36px; padding-right: 16px;">
+                                <option value="">All Modules</option>
+                            </select>
+                        </div>
+
+                        <!-- Reseller Select Filter -->
+                        <div class="select-wrapper" style="width: 100%;">
+                            <i class="fa-solid fa-users select-icon"></i>
+                            <select id="reseller-filter" aria-label="Filter by Reseller" style="width: 100%; padding-left: 36px; padding-right: 16px;">
+                                <option value="">All Resellers</option>
+                            </select>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="select-wrapper" style="width: 100%;">
+                            <i class="fa-solid fa-filter select-icon"></i>
+                            <select id="status-filter" aria-label="Filter by Status" style="width: 100%; padding-left: 36px; padding-right: 16px;">
+                                <option value="">All Statuses</option>
+                                <option value="sukses">Sukses</option>
+                                <option value="gagal">Gagal</option>
+                                <option value="proses">Proses</option>
+                            </select>
+                        </div>
+
+                        <!-- "Termasuk SN kosong" Toggle Switch -->
+                        <label class="premium-switch">
+                            <input type="checkbox" id="sn-empty-checkbox" checked>
+                            <span class="premium-switch-slider"></span>
+                            <span>Termasuk SN kosong</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Main Data Table -->
+                <div class="table-container" style="overflow-x: auto;">
+                    <table id="modules-table" style="width: 100%; min-width: 1000px;">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width: 70px;">TrxID</th>
+                                <th scope="col" style="width: 110px;">Waktu</th>
+                                <th scope="col" style="width: 120px;">Reseller</th>
+                                <th scope="col" style="width: 100px;">Modul</th>
+                                <th scope="col" style="width: 70px;">Produk</th>
+                                <th scope="col" style="width: 100px;">Tujuan</th>
+                                <th scope="col" style="width: 130px;">SN</th>
+                                <th scope="col" class="text-right" style="width: 80px;">Hrg Beli</th>
+                                <th scope="col" class="text-right" style="width: 80px;">Hrg Jual</th>
+                                <th scope="col" class="text-right" style="width: 80px;">Laba</th>
+                                <th scope="col" style="width: 110px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <tr class="placeholder-row">
+                                <td colspan="11">
+                                    <div class="table-loader-wrapper">
+                                        <div class="spinner"></div>
+                                        <span>Fetching transactions...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination controls -->
+                <div class="pagination-panel">
+                    <span class="pagination-info" id="pagination-info">Showing 0 to 0 of 0 transactions</span>
+                    <div class="pagination-controls">
+                        <button class="btn-pagination" id="btn-prev" disabled aria-label="Previous Page">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <div class="page-numbers" id="page-numbers">
+                            <!-- Page numbers will be inserted here -->
+                        </div>
+                        <button class="btn-pagination" id="btn-next" disabled aria-label="Next Page">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Page Logic Script -->
+    <script src="modul.js"></script>
+</body>
+
+</html>

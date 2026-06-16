@@ -35,17 +35,25 @@
                 <div class="logo-text">BMP<span>Dashboard</span></div>
             </div>
             <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" id="nav-dashboard">
+                <a href="dashboard" class="nav-item active" id="nav-dashboard">
                     <i class="fa-solid fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="analytics.html" class="nav-item" id="nav-analytics">
+                <a href="analytics" class="nav-item" id="nav-analytics">
                     <i class="fa-solid fa-chart-pie"></i>
                     <span>Analytics</span>
                 </a>
                 <a href="inbox" class="nav-item" id="nav-inbox">
                     <i class="fa-solid fa-inbox"></i>
                     <span>Inbox</span>
+                </a>
+                <a href="modul" class="nav-item" id="nav-modul">
+                    <i class="fa-solid fa-cubes"></i>
+                    <span>Modul</span>
+                </a>
+                <a href="member" class="nav-item" id="nav-member">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Member</span>
                 </a>
                 <a href="#" class="nav-item" id="nav-refresh">
                     <i class="fa-solid fa-rotate"></i>
@@ -84,7 +92,7 @@
             </header>
 
             <!-- KPI Summary Stats -->
-            <section class="stats-grid" aria-label="Key Performance Indicators">
+            <section class="stats-grid kpi-grid" aria-label="Key Performance Indicators">
                 <!-- Stat Card: Total -->
                 <div class="stat-card" id="card-total">
                     <div class="stat-icon-wrapper total">
@@ -142,18 +150,6 @@
                         <span class="stat-label">Suspect</span>
                         <h2 class="stat-value" id="stat-suspect-val">-</h2>
                         <span class="stat-meta" id="stat-suspect-pct">0% Suspect</span>
-                    </div>
-                </div>
-
-                <!-- Stat Card: Suspect -->
-                <div class="stat-card" id="card-suspect">
-                    <div class="stat-icon-wrapper suspect">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-label">Wrong Number</span>
-                        <h2 class="stat-value" id="stat-suspect-val">-</h2>
-                        <span class="stat-meta" id="stat-suspect-pct">0% Wrong Number</span>
                     </div>
                 </div>
 
@@ -249,6 +245,7 @@
                                 <option value="40">Failed (40)</option>
                                 <option value="50">Canceled (50)</option>
                                 <option value="suspect">Suspect (51)</option>
+                                <option value="54">Tujuan Salah (54)</option>
                                 <option value="55">Timeout (55)</option>
                             </select>
                         </div>

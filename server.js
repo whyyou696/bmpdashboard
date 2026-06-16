@@ -37,9 +37,11 @@ app.get("/transactions", async (req, res) => {
 
         if (status !== "all") {
             if (status === "suspect") {
-                conditions.push("status NOT IN (40, 50, 52) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND')");
+                conditions.push("status NOT IN (40, 50, 52, 54) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND')");
             } else if (status === "40") {
-                conditions.push("status IN (40, 52)");
+                conditions.push("status IN (40, 52, 54)");
+            } else if (status === "54") {
+                conditions.push("status IN (52, 54)");
             } else {
                 const statusInt = parseInt(status);
                 if (!isNaN(statusInt)) {
@@ -176,10 +178,11 @@ app.get("/transactions/stats", async (req, res) => {
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 20 AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as successCount,
-                SUM(CASE WHEN status = 40 OR status = 52 THEN 1 ELSE 0 END) as failedCount,
+                SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END) as failedCount,
                 SUM(CASE WHEN status = 50 THEN 1 ELSE 0 END) as canceledCount,
-                SUM(CASE WHEN status NOT IN (40, 50, 52) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') THEN 1 ELSE 0 END) as suspectCount,
-                SUM(CASE WHEN status NOT IN (20, 40, 50, 52) AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as pendingCount,
+                SUM(CASE WHEN status NOT IN (40, 50, 52, 54) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') THEN 1 ELSE 0 END) as suspectCount,
+                SUM(CASE WHEN status IN (52, 54) THEN 1 ELSE 0 END) as wrongNumberCount,
+                SUM(CASE WHEN status NOT IN (20, 40, 50, 52, 54) AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as pendingCount,
                 SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga, 0) AS BIGINT) ELSE 0 END) as totalRetail,
                 SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga_beli, 0) AS BIGINT) ELSE 0 END) as totalCost,
                 SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as totalProfit
@@ -195,6 +198,7 @@ app.get("/transactions/stats", async (req, res) => {
             failedCount: stats.failedCount || 0,
             canceledCount: stats.canceledCount || 0,
             suspectCount: stats.suspectCount || 0,
+            wrongNumberCount: stats.wrongNumberCount || 0,
             pendingCount: stats.pendingCount || 0,
             successRate: parseFloat(successRate),
             totalRetail: stats.totalRetail || 0,
@@ -1041,6 +1045,10 @@ app.get("/analytics", (req, res) => {
     res.sendFile(path.join(__dirname, "analytics.html"));
 });
 
+app.get("/member", (req, res) => {
+    res.sendFile(path.join(__dirname, "member.html"));
+});
+
 // ==========================================
 // INBOX ROUTE & API ENDPOINTS
 // ==========================================
@@ -1619,6 +1627,320 @@ app.get("/api/inbox/:id", async (req, res) => {
 
     } catch (err) {
         console.error("API Error /api/inbox/:id:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/member/stats (Supplier Modul stats and balance calculations)
+app.get("/api/member/stats", async (req, res) => {
+    try {
+        const pool = await sql.connect(config);
+        
+        // 1. Get module list with transaction stats from last 30 days
+        const moduleResult = await pool.request().query(`
+            SELECT 
+                m.kode, 
+                m.label, 
+                m.tujuan, 
+                m.aktif, 
+                m.saldo,
+                ISNULL(t_stats.total_trx, 0) as total_trx,
+                ISNULL(t_stats.success_trx, 0) as success_trx
+            FROM modul m
+            LEFT JOIN (
+                SELECT 
+                    kode_modul, 
+                    COUNT(*) as total_trx,
+                    SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as success_trx
+                FROM transaksi
+                WHERE tgl_entri >= DATEADD(day, -30, GETDATE())
+                GROUP BY kode_modul
+            ) t_stats ON m.kode = t_stats.kode_modul
+            WHERE m.deleted = 0
+            ORDER BY total_trx DESC
+        `);
+
+        // 2. Get summaries
+        const summaryResult = await pool.request().query(`
+            SELECT 
+                SUM(CASE WHEN aktif = 1 THEN ISNULL(saldo, 0) ELSE 0 END) as totalSaldo,
+                SUM(CASE WHEN aktif = 1 THEN 1 ELSE 0 END) as activeCount,
+                SUM(CASE WHEN aktif = 0 THEN 1 ELSE 0 END) as inactiveCount
+            FROM modul
+            WHERE deleted = 0
+        `);
+
+        const summary = summaryResult.recordset[0];
+        const modules = moduleResult.recordset.map(m => {
+            const total = m.total_trx;
+            const success = m.success_trx;
+            const rate = total > 0 ? parseFloat(((success / total) * 100).toFixed(1)) : 0.0;
+            return {
+                ...m,
+                success_rate: rate
+            };
+        });
+
+        const totalTrx30Days = modules.reduce((sum, m) => sum + m.total_trx, 0);
+        const potentialActiveCount = modules.filter(m => m.aktif === 1 && ((m.saldo && m.saldo > 0) || m.total_trx > 0)).length;
+        const nonPotentialCount = modules.filter(m => m.aktif === 0 || (m.aktif === 1 && (!m.saldo || m.saldo <= 0) && m.total_trx === 0)).length;
+
+        res.json({
+            modules,
+            summary: {
+                totalSaldo: summary.totalSaldo || 0,
+                activeCount: summary.activeCount || 0,
+                inactiveCount: summary.inactiveCount || 0,
+                potentialActiveCount,
+                nonPotentialCount,
+                totalTrx30Days
+            }
+        });
+    } catch (err) {
+        console.error("API Error /api/member/stats:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// Route to serve Modul HTML page
+app.get("/modul", (req, res) => {
+    res.sendFile(path.join(__dirname, "modul.html"));
+});
+
+// GET /api/modul/init (Get active modules and resellers for table filters)
+app.get("/api/modul/init", async (req, res) => {
+    try {
+        const pool = await sql.connect(config);
+        const modules = await pool.request().query("SELECT kode, label FROM modul WHERE deleted = 0 ORDER BY label");
+        const resellers = await pool.request().query("SELECT kode, nama FROM reseller WHERE aktif = 1 ORDER BY nama");
+        res.json({
+            modules: modules.recordset,
+            resellers: resellers.recordset
+        });
+    } catch (err) {
+        console.error("API Error /api/modul/init:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/modul/transactions (Paginated transaction monitoring and module productivity statistics)
+app.get("/api/modul/transactions", async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+
+        const search = req.query.search || "";
+        const modul = req.query.modul || "";
+        const reseller = req.query.reseller || "";
+        const status = req.query.status || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
+        const sn_empty = req.query.sn_empty || "true";
+
+        const pool = await sql.connect(config);
+        const request = pool.request();
+
+        let conditions = [];
+
+        // 1. Date Range filter (Required to limit query size and avoid timeouts)
+        let start, end;
+        if (startDate && endDate) {
+            const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+            start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
+
+            const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+            end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+        } else {
+            // Default range: Today & Yesterday
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            
+            start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0, 0);
+            end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+        }
+        conditions.push("t.tgl_entri >= @startDate AND t.tgl_entri <= @endDate");
+        request.input("startDate", sql.DateTime2, start);
+        request.input("endDate", sql.DateTime2, end);
+
+        // 2. Search query filter
+        if (search) {
+            conditions.push("(t.tujuan LIKE @search OR t.kode_produk LIKE @search OR t.sn LIKE @search OR r.nama LIKE @search OR m.label LIKE @search OR CAST(t.kode AS VARCHAR) LIKE @search)");
+            request.input("search", sql.VarChar, `%${search}%`);
+        }
+
+        // 3. Module filter
+        if (modul) {
+            conditions.push("t.kode_modul = @modul");
+            request.input("modul", sql.Int, parseInt(modul));
+        }
+
+        // 4. Reseller filter
+        if (reseller) {
+            conditions.push("t.kode_reseller = @reseller");
+            request.input("reseller", sql.VarChar, reseller);
+        }
+
+        // 5. Status filter
+        if (status) {
+            if (status === 'sukses') {
+                conditions.push("t.status = 20");
+            } else if (status === 'gagal') {
+                conditions.push("t.status IN (40, 50, 52, 54, 55)");
+            } else if (status === 'proses') {
+                conditions.push("t.status IN (0, 1, 2)");
+            }
+        }
+
+        // 6. Include/Exclude Empty SN
+        if (sn_empty === 'false') {
+            conditions.push("t.sn IS NOT NULL AND t.sn != '' AND t.sn != 'N/A' AND t.sn != 'NULL' AND t.sn != '0000'");
+        }
+
+        const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+        const buildRequestWithParams = () => {
+            const req = pool.request();
+            req.input("startDate", sql.DateTime2, start);
+            req.input("endDate", sql.DateTime2, end);
+            if (search) req.input("search", sql.VarChar, `%${search}%`);
+            if (modul) req.input("modul", sql.Int, parseInt(modul));
+            if (reseller) req.input("reseller", sql.VarChar, reseller);
+            return req;
+        };
+
+        // Query 1: Get productivity metrics (aggregates)
+        const statsQuery = `
+            SELECT 
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx,
+                SUM(CASE WHEN t.status IN (40, 50, 52, 54, 55) THEN 1 ELSE 0 END) as failed_trx,
+                SUM(CASE WHEN t.status = 20 THEN ISNULL(t.harga, 0) ELSE 0 END) as total_omset,
+                SUM(CASE WHEN t.status = 20 THEN ISNULL(t.harga - t.harga_beli, 0) ELSE 0 END) as total_laba
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+        `;
+        const statsResult = await buildRequestWithParams().query(statsQuery);
+        const stats = statsResult.recordset[0] || { total_trx: 0, success_trx: 0, failed_trx: 0, total_omset: 0, total_laba: 0 };
+        const successRate = stats.total_trx > 0 ? parseFloat(((stats.success_trx / stats.total_trx) * 100).toFixed(1)) : 0.0;
+
+        // Query 1.5: Get supplier balance for the modules
+        let saldoQuery = "SELECT SUM(saldo) as total_saldo FROM modul WHERE deleted = 0 AND aktif = 1";
+        if (modul) {
+            saldoQuery += " AND kode = @modul_id";
+        }
+        const saldoReq = pool.request();
+        if (modul) {
+            saldoReq.input("modul_id", sql.Int, parseInt(modul));
+        }
+        const saldoResult = await saldoReq.query(saldoQuery);
+        const totalSaldo = saldoResult.recordset[0].total_saldo || 0;
+
+        // Query 1.6: Get Top 5 Modul
+        const topModulesQuery = `
+            SELECT TOP 5 
+                ISNULL(m.label, 'Unknown') as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY m.label
+            ORDER BY total_trx DESC
+        `;
+        const topModulesResult = await buildRequestWithParams().query(topModulesQuery);
+
+        // Query 1.7: Get Top 5 Produk
+        const topProductsQuery = `
+            SELECT TOP 5 
+                t.kode_produk as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY t.kode_produk
+            ORDER BY total_trx DESC
+        `;
+        const topProductsResult = await buildRequestWithParams().query(topProductsQuery);
+
+        // Query 1.8: Get Top 5 Reseller
+        const topResellersQuery = `
+            SELECT TOP 5 
+                ISNULL(r.nama, 'Unknown') as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY r.nama
+            ORDER BY total_trx DESC
+        `;
+        const topResellersResult = await buildRequestWithParams().query(topResellersQuery);
+
+        // Query 2: Get paginated transaction records
+        const dataQuery = `
+            SELECT 
+                t.kode as TrxID,
+                t.tgl_entri,
+                t.tgl_status,
+                t.kode_produk,
+                t.tujuan,
+                t.sn,
+                r.nama as nama_reseller,
+                t.status,
+                m.label as nama_modul,
+                t.harga_beli,
+                t.harga,
+                (CASE WHEN t.status = 20 THEN (t.harga - t.harga_beli) ELSE 0 END) as laba,
+                ISNULL(t.saldo_supplier, m.saldo) as saldo_supplier,
+                t.keterangan as jawaban_provider
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            ORDER BY t.tgl_entri DESC
+            OFFSET @offset ROWS
+            FETCH NEXT @limit ROWS ONLY
+        `;
+        const dataResult = await buildRequestWithParams()
+            .input("offset", sql.Int, offset)
+            .input("limit", sql.Int, limit)
+            .query(dataQuery);
+
+        res.json({
+            data: dataResult.recordset,
+            productivity: {
+                totalTrx: stats.total_trx || 0,
+                successTrx: stats.success_trx || 0,
+                failedTrx: stats.failed_trx || 0,
+                successRate: successRate,
+                totalOmset: stats.total_omset || 0,
+                totalLaba: stats.total_laba || 0,
+                totalSaldo: totalSaldo
+            },
+            topLists: {
+                modules: topModulesResult.recordset,
+                products: topProductsResult.recordset,
+                resellers: topResellersResult.recordset
+            },
+            pagination: {
+                page,
+                limit,
+                total: stats.total_trx || 0,
+                totalPages: Math.ceil((stats.total_trx || 0) / limit)
+            }
+        });
+
+    } catch (err) {
+        console.error("API Error /api/modul/transactions:", err);
         res.status(500).json({ error: err.message });
     }
 });

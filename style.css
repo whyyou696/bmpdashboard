@@ -290,7 +290,8 @@ body {
     background: linear-gradient(90deg, #f43f5e, #e11d48);
 }
 
-.stat-card#card-suspect::after {
+.stat-card#card-suspect::after,
+.stat-card#card-wrong-number::after {
     background: linear-gradient(90deg, #f97316, #d97706);
 }
 
@@ -308,6 +309,22 @@ body {
 
 .stat-card#card-profit::after {
     background: linear-gradient(90deg, #06b6d4, #10b981);
+}
+
+.stat-card#card-total-saldo::after {
+    background: linear-gradient(90deg, var(--vivid-blue), var(--blue));
+}
+
+.stat-card#card-potential-active::after {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.stat-card#card-non-potential::after {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.stat-card#card-trx-30d::after {
+    background: linear-gradient(90deg, #f97316, #d97706);
 }
 
 .stat-card:hover::after {
@@ -1340,4 +1357,21 @@ input:checked+.slider:before {
     background: rgba(239, 68, 68, 0.05);
     border-color: var(--failed);
     color: var(--failed);
+}
+
+/* KPI Summary Grid 3 columns Layout (3 on top, 3 at bottom) */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 20px;
+}
+@media (max-width: 1024px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+@media (max-width: 640px) {
+    .kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
 }
