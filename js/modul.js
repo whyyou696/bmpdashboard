@@ -11,6 +11,9 @@ const searchInput = document.getElementById('search-input');
 const limitFilter = document.getElementById('limit-filter');
 const startDateFilter = document.getElementById('start-date-filter');
 const endDateFilter = document.getElementById('end-date-filter');
+const dateModeFilter = document.getElementById('date-mode-filter');
+const customDateStart = document.getElementById('custom-date-start');
+const customDateEnd = document.getElementById('custom-date-end');
 const modulFilter = document.getElementById('modul-filter');
 const resellerFilter = document.getElementById('reseller-filter');
 const statusFilter = document.getElementById('status-filter');
@@ -78,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appContainer.style.display = 'flex';
     }
 
-    // Initialize Default Dates (Yesterday and Today)
+    // Initialize Default Dates (Today)
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
@@ -90,8 +93,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${yyyy}-${mm}-${dd}`;
     };
 
-    startDateFilter.value = formatISODate(yesterday);
+    startDateFilter.value = formatISODate(today);
     endDateFilter.value = formatISODate(today);
+
+    // Date Mode Toggle
+    if (dateModeFilter) {
+        dateModeFilter.addEventListener('change', () => {
+            const mode = dateModeFilter.value;
+            if (mode === 'today') {
+                if (customDateStart) customDateStart.style.display = 'none';
+                if (customDateEnd) customDateEnd.style.display = 'none';
+                startDateFilter.value = formatISODate(today);
+                endDateFilter.value = formatISODate(today);
+            } else if (mode === 'all') {
+                if (customDateStart) customDateStart.style.display = 'none';
+                if (customDateEnd) customDateEnd.style.display = 'none';
+                startDateFilter.value = '';
+                endDateFilter.value = '';
+            } else {
+                if (customDateStart) customDateStart.style.display = 'flex';
+                if (customDateEnd) customDateEnd.style.display = 'flex';
+                startDateFilter.value = formatISODate(yesterday);
+                endDateFilter.value = formatISODate(today);
+            }
+            currentPage = 1;
+            fetchData();
+        });
+    }
 
     updateTime();
     setInterval(updateTime, 1000);
@@ -172,7 +200,12 @@ document.addEventListener('DOMContentLoaded', () => {
         btnResetDash.addEventListener('click', () => {
             searchInput.value = '';
             limitFilter.value = '20';
-            startDateFilter.value = formatISODate(yesterday);
+            if (dateModeFilter) {
+                dateModeFilter.value = 'today';
+                if (customDateStart) customDateStart.style.display = 'none';
+                if (customDateEnd) customDateEnd.style.display = 'none';
+            }
+            startDateFilter.value = formatISODate(today);
             endDateFilter.value = formatISODate(today);
             modulFilter.value = '';
             resellerFilter.value = '';
@@ -252,8 +285,9 @@ async function fetchData() {
     const resellerVal = resellerFilter.value;
     const statusVal = statusFilter.value;
     const snEmptyVal = snEmptyCheckbox.checked ? 'true' : 'false';
+    const dateModeVal = dateModeFilter ? dateModeFilter.value : '';
 
-    const url = `${API_BASE_URL}/api/modul/transactions?page=${currentPage}&limit=${limitVal}&search=${searchVal}&startDate=${startVal}&endDate=${endVal}&modul=${modulVal}&reseller=${resellerVal}&status=${statusVal}&sn_empty=${snEmptyVal}`;
+    const url = `${API_BASE_URL}/api/modul/transactions?page=${currentPage}&limit=${limitVal}&search=${searchVal}&startDate=${startVal}&endDate=${endVal}&dateMode=${dateModeVal}&modul=${modulVal}&reseller=${resellerVal}&status=${statusVal}&sn_empty=${snEmptyVal}`;
 
     try {
         const response = await fetch(url);
@@ -312,7 +346,7 @@ function renderTable(transactionsList) {
     if (transactionsList.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="11">
+                <td colspan="12">
                     <div class="empty-state">
                         <i class="fa-regular fa-folder-open empty-icon"></i>
                         <p>No transactions found matching the search criteria</p>
@@ -364,17 +398,20 @@ function renderTable(transactionsList) {
             `;
         }
 
+        const saldoSupplier = t.saldo_supplier !== null && t.saldo_supplier !== undefined ? formatCurrency(t.saldo_supplier) : '<span class="text-muted">-</span>';
+
         row.innerHTML = `
             <td style="font-weight: 600; font-family: monospace;">${t.TrxID || '-'}</td>
             <td style="font-size: 0.8rem; color: var(--text-secondary);">${tglEntri}</td>
-            <td style="font-weight: 500;">${t.nama_reseller || '-'}</td>
             <td style="font-weight: 500;">${t.nama_modul || '-'}</td>
+            <td style="font-weight: 500;">${t.nama_reseller || '-'}</td>
             <td style="font-weight: 500;">${t.kode_produk || '-'}</td>
             <td style="font-family: monospace;">${t.tujuan || '-'}</td>
             <td style="font-family: monospace; font-size: 0.8rem;">${t.sn || '<span class="text-muted">-</span>'}</td>
             <td class="text-right" style="font-family: monospace;">${hrgBeli}</td>
             <td class="text-right" style="font-family: monospace;">${hrgJual}</td>
             <td class="text-right" style="font-family: monospace;">${labaFormatted}</td>
+            <td class="text-right" style="font-family: monospace;">${saldoSupplier}</td>
             <td>${statusColContent}</td>
         `;
         tableBody.appendChild(row);
@@ -462,7 +499,7 @@ function formatCurrency(amount) {
 function showTableLoading() {
     tableBody.innerHTML = `
         <tr class="placeholder-row">
-            <td colspan="11">
+            <td colspan="12">
                 <div class="table-loader-wrapper">
                     <div class="spinner"></div>
                     <span>Fetching transactions...</span>
@@ -476,7 +513,7 @@ function showTableLoading() {
 function showTableError(message) {
     tableBody.innerHTML = `
         <tr>
-            <td colspan="11">
+            <td colspan="12">
                 <div class="empty-state" style="color: var(--failed);">
                     <i class="fa-solid fa-circle-exclamation empty-icon" style="color: var(--failed);"></i>
                     <p style="font-weight: 600;">Failed to Load Transactions</p>

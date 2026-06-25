@@ -12,8 +12,6 @@ const API_BASE_URL = (window.location.protocol === 'file:') ? 'http://localhost:
 const searchInput = document.getElementById('search-input');
 const statusFilter = document.getElementById('status-filter');
 const limitFilter = document.getElementById('limit-filter');
-const dateFilter = document.getElementById('date-filter');
-const btnClearDate = document.getElementById('btn-clear-date');
 const tableBody = document.getElementById('table-body');
 const paginationInfo = document.getElementById('pagination-info');
 const pageNumbersContainer = document.getElementById('page-numbers');
@@ -140,19 +138,36 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchData();
     });
 
-    dateFilter.addEventListener('change', () => {
-        if (dateFilter.value) {
-            btnClearDate.style.display = 'flex';
+    const dateModeSelect = document.getElementById('date-mode-select');
+    const customDateInputs = document.getElementById('custom-date-inputs');
+    const startDateFilter = document.getElementById('start-date-filter');
+    const endDateFilter = document.getElementById('end-date-filter');
+
+    // Populate initial dates
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    startDateFilter.value = todayStr;
+    endDateFilter.value = todayStr;
+
+    dateModeSelect.addEventListener('change', () => {
+        if (dateModeSelect.value === 'custom') {
+            customDateInputs.style.display = 'flex';
         } else {
-            btnClearDate.style.display = 'none';
+            customDateInputs.style.display = 'none';
         }
         currentPage = 1;
         fetchData();
     });
 
-    btnClearDate.addEventListener('click', () => {
-        dateFilter.value = '';
-        btnClearDate.style.display = 'none';
+    startDateFilter.addEventListener('change', () => {
+        currentPage = 1;
+        fetchData();
+    });
+
+    endDateFilter.addEventListener('change', () => {
         currentPage = 1;
         fetchData();
     });
@@ -189,10 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
         btnResetDash.addEventListener('click', () => {
             searchInput.value = '';
             statusFilter.value = 'all';
-            dateFilter.value = '';
+            dateModeSelect.value = 'today';
+            customDateInputs.style.display = 'none';
+            startDateFilter.value = todayStr;
+            endDateFilter.value = todayStr;
             limitFilter.value = '5';
             rowsPerPage = 5;
-            btnClearDate.style.display = 'none';
             currentPage = 1;
             fetchData(true);
         });
@@ -215,13 +232,31 @@ async function fetchData(updateStats = true) {
 
     const searchVal = searchInput.value.trim();
     const statusVal = statusFilter.value;
-    const dateVal = dateFilter.value;
+    
+    const dateModeSelect = document.getElementById('date-mode-select');
+    const startDateFilter = document.getElementById('start-date-filter');
+    const endDateFilter = document.getElementById('end-date-filter');
+    
+    let startDateVal = '';
+    let endDateVal = '';
+    
+    if (dateModeSelect.value === 'today') {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        startDateVal = `${yyyy}-${mm}-${dd}`;
+        endDateVal = startDateVal;
+    } else if (dateModeSelect.value === 'custom') {
+        startDateVal = startDateFilter.value;
+        endDateVal = endDateFilter.value;
+    }
 
     try {
         // Fetch stats if requested
         if (updateStats) {
-            fetchStats(dateVal);
-            fetchChartData(dateVal);
+            fetchStats(startDateVal, endDateVal);
+            fetchChartData(startDateVal, endDateVal, dateModeSelect.value);
         }
 
         // Fetch transactions
@@ -230,7 +265,9 @@ async function fetchData(updateStats = true) {
             limit: rowsPerPage,
             status: statusVal,
             search: searchVal,
-            date: dateVal
+            startDate: startDateVal,
+            endDate: endDateVal,
+            dateMode: dateModeSelect.value
         });
 
         const response = await fetch(`${API_BASE_URL}/transactions?${queryParams.toString()}`);
@@ -254,11 +291,12 @@ async function fetchData(updateStats = true) {
 }
 
 // Fetch Summary Stats from Server
-async function fetchStats(dateVal = '') {
+async function fetchStats(startDateVal = '', endDateVal = '') {
     try {
         const queryParams = new URLSearchParams();
-        if (dateVal) {
-            queryParams.append('date', dateVal);
+        if (startDateVal && endDateVal) {
+            queryParams.append('startDate', startDateVal);
+            queryParams.append('endDate', endDateVal);
         }
 
         const response = await fetch(`${API_BASE_URL}/transactions/stats?${queryParams.toString()}`);
@@ -349,12 +387,20 @@ function formatSimpleDate(dateStr) {
 }
 
 // Fetch Chart Data from Server
-async function fetchChartData(dateVal = '') {
+async function fetchChartData(startDateVal = '', endDateVal = '', dateModeVal = '') {
     try {
         const queryParams = new URLSearchParams();
-        if (dateVal) {
-            queryParams.append('date', dateVal);
-            chartSubtitle.textContent = `Showing hourly trends for ${formatSimpleDate(dateVal)}`;
+        if (dateModeVal === 'all') {
+            queryParams.append('dateMode', 'all');
+            chartSubtitle.textContent = 'Showing trends for all dates';
+        } else if (startDateVal && endDateVal) {
+            queryParams.append('startDate', startDateVal);
+            queryParams.append('endDate', endDateVal);
+            if (startDateVal === endDateVal) {
+                chartSubtitle.textContent = `Showing hourly trends for ${formatSimpleDate(startDateVal)}`;
+            } else {
+                chartSubtitle.textContent = `Showing trends from ${formatSimpleDate(startDateVal)} to ${formatSimpleDate(endDateVal)}`;
+            }
         } else {
             chartSubtitle.textContent = 'Showing trends for the last 7 days';
         }
@@ -364,7 +410,7 @@ async function fetchChartData(dateVal = '') {
             throw new Error(`Chart Error: ${response.status}`);
         }
         const data = await response.json();
-        renderChart(data, !!dateVal);
+        renderChart(data, startDateVal !== '' && startDateVal === endDateVal);
     } catch (error) {
         console.error('Failed to fetch chart data:', error);
     }

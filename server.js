@@ -29,6 +29,8 @@ app.get("/transactions", async (req, res) => {
         const status = req.query.status || "all";
         const search = req.query.search || "";
         const date = req.query.date || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
 
         const pool = await sql.connect(config);
         const request = pool.request();
@@ -56,7 +58,11 @@ app.get("/transactions", async (req, res) => {
             request.input("search", sql.VarChar, `%${search}%`);
         }
 
-        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+            conditions.push("CONVERT(date, tgl_entri) >= @startDate AND CONVERT(date, tgl_entri) <= @endDate");
+            request.input("startDate", sql.VarChar, startDate);
+            request.input("endDate", sql.VarChar, endDate);
+        } else if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
             conditions.push("CONVERT(date, tgl_entri) = @date");
             request.input("date", sql.VarChar, date);
         }
@@ -165,11 +171,17 @@ app.get("/transactions/success", async (req, res) => {
 app.get("/transactions/stats", async (req, res) => {
     try {
         const date = req.query.date || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
         const pool = await sql.connect(config);
         const request = pool.request();
 
         let whereClause = "";
-        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+            whereClause = "WHERE CONVERT(date, tgl_entri) >= @startDate AND CONVERT(date, tgl_entri) <= @endDate";
+            request.input("startDate", sql.VarChar, startDate);
+            request.input("endDate", sql.VarChar, endDate);
+        } else if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
             whereClause = "WHERE CONVERT(date, tgl_entri) = @date";
             request.input("date", sql.VarChar, date);
         }
@@ -214,11 +226,57 @@ app.get("/transactions/stats", async (req, res) => {
 app.get("/transactions/chart", async (req, res) => {
     try {
         const date = req.query.date || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
+        const dateMode = req.query.dateMode || "";
         const pool = await sql.connect(config);
         const request = pool.request();
 
         let query = "";
-        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        if (dateMode === "all") {
+            query = `
+                SELECT 
+                    CONVERT(date, tgl_entri) as label,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as success,
+                    SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END) as failed,
+                    SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as profit
+                FROM transaksi
+                GROUP BY CONVERT(date, tgl_entri)
+                ORDER BY label ASC
+            `;
+        } else if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+            if (startDate === endDate) {
+                request.input("date", sql.VarChar, startDate);
+                query = `
+                    SELECT 
+                        DATEPART(hour, tgl_entri) as label,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as success,
+                        SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as profit
+                    FROM transaksi
+                    WHERE CONVERT(date, tgl_entri) = @date
+                    GROUP BY DATEPART(hour, tgl_entri)
+                    ORDER BY label ASC
+                `;
+            } else {
+                request.input("startDate", sql.VarChar, startDate);
+                request.input("endDate", sql.VarChar, endDate);
+                query = `
+                    SELECT 
+                        CONVERT(date, tgl_entri) as label,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END) as success,
+                        SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as profit
+                    FROM transaksi
+                    WHERE CONVERT(date, tgl_entri) >= @startDate AND CONVERT(date, tgl_entri) <= @endDate
+                    GROUP BY CONVERT(date, tgl_entri)
+                    ORDER BY label ASC
+                `;
+            }
+        } else if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
             request.input("date", sql.VarChar, date);
             query = `
                 SELECT 
@@ -267,6 +325,9 @@ function getDateRanges(range, startDateStr, endDateStr) {
     
     if (range === 'today') {
         currentStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        currentEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    } else if (range === 'all') {
+        currentStart = new Date(1970, 0, 1);
         currentEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (range === 'yesterday') {
         currentStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
@@ -1708,6 +1769,277 @@ app.get("/modul", (req, res) => {
     res.sendFile(path.join(__dirname, "modul.html"));
 });
 
+// Route to serve Product HTML page
+app.get("/product", (req, res) => {
+    res.sendFile(path.join(__dirname, "product.html"));
+});
+
+// GET /api/product/init (Get active products, modules, and resellers for filters)
+app.get("/api/product/init", async (req, res) => {
+    try {
+        const pool = await sql.connect(config);
+        const products = await pool.request().query("SELECT DISTINCT kode_produk FROM transaksi WHERE kode_produk IS NOT NULL AND kode_produk != '' ORDER BY kode_produk");
+        const modules = await pool.request().query("SELECT kode, label FROM modul WHERE deleted = 0 ORDER BY label");
+        const resellers = await pool.request().query("SELECT kode, nama FROM reseller WHERE aktif = 1 ORDER BY nama");
+        res.json({
+            products: products.recordset.map(r => r.kode_produk),
+            modules: modules.recordset,
+            resellers: resellers.recordset
+        });
+    } catch (err) {
+        console.error("API Error /api/product/init:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/product/transactions (Paginated transaction monitoring and product productivity statistics)
+app.get("/api/product/transactions", async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+
+        const search = req.query.search || "";
+        const product = req.query.product || "";
+        const modul = req.query.modul || "";
+        const reseller = req.query.reseller || "";
+        const status = req.query.status || "";
+        const startDate = req.query.startDate || "";
+        const endDate = req.query.endDate || "";
+        const dateMode = req.query.dateMode || "";
+        const sn_empty = req.query.sn_empty || "true";
+
+        const pool = await sql.connect(config);
+        const request = pool.request();
+
+        let conditions = [];
+
+        // 1. Date Range filter (Required to limit query size and avoid timeouts)
+        let start, end;
+        if (dateMode !== "all") {
+            if (startDate && endDate) {
+                const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+                start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
+
+                const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+                end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+            } else {
+                // Default range: Today & Yesterday
+                const today = new Date();
+                const yesterday = new Date();
+                yesterday.setDate(today.getDate() - 1);
+                
+                start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0, 0);
+                end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+            }
+            conditions.push("t.tgl_entri >= @startDate AND t.tgl_entri <= @endDate");
+            request.input("startDate", sql.DateTime2, start);
+            request.input("endDate", sql.DateTime2, end);
+        }
+
+        // 2. Search query filter
+        if (search) {
+            conditions.push("(t.tujuan LIKE @search OR t.kode_produk LIKE @search OR t.sn LIKE @search OR r.nama LIKE @search OR m.label LIKE @search OR CAST(t.kode AS VARCHAR) LIKE @search)");
+            request.input("search", sql.VarChar, `%${search}%`);
+        }
+
+        // 3. Product filter
+        if (product) {
+            conditions.push("t.kode_produk = @product");
+            request.input("product", sql.VarChar, product);
+        }
+
+        // 4. Module filter
+        if (modul) {
+            conditions.push("t.kode_modul = @modul");
+            request.input("modul", sql.Int, parseInt(modul));
+        }
+
+        // 5. Reseller filter
+        if (reseller) {
+            conditions.push("t.kode_reseller = @reseller");
+            request.input("reseller", sql.VarChar, reseller);
+        }
+
+        // 6. Status filter
+        if (status) {
+            if (status === 'sukses') {
+                conditions.push("t.status = 20");
+            } else if (status === 'gagal') {
+                conditions.push("t.status IN (40, 50, 52, 54, 55)");
+            } else if (status === 'proses') {
+                conditions.push("t.status IN (0, 1, 2)");
+            }
+        }
+
+        // 7. Include/Exclude Empty SN
+        if (sn_empty === 'false') {
+            conditions.push("t.sn IS NOT NULL AND t.sn != '' AND t.sn != 'N/A' AND t.sn != 'NULL' AND t.sn != '0000'");
+        }
+
+        const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+        const buildRequestWithParams = () => {
+            const req = pool.request();
+            if (start) req.input("startDate", sql.DateTime2, start);
+            if (end) req.input("endDate", sql.DateTime2, end);
+            if (search) req.input("search", sql.VarChar, `%${search}%`);
+            if (product) req.input("product", sql.VarChar, product);
+            if (modul) req.input("modul", sql.Int, parseInt(modul));
+            if (reseller) req.input("reseller", sql.VarChar, reseller);
+            return req;
+        };
+
+        // Query 1: Get productivity metrics (aggregates)
+        const statsQuery = `
+            SELECT 
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx,
+                SUM(CASE WHEN t.status IN (40, 50, 52, 54, 55) THEN 1 ELSE 0 END) as failed_trx,
+                SUM(CASE WHEN t.status = 20 THEN ISNULL(t.harga, 0) ELSE 0 END) as total_omset,
+                SUM(CASE WHEN t.status = 20 THEN ISNULL(t.harga - t.harga_beli, 0) ELSE 0 END) as total_laba,
+                COUNT(DISTINCT t.kode_produk) as unique_products
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+        `;
+        const statsResult = await buildRequestWithParams().query(statsQuery);
+        const stats = statsResult.recordset[0] || { total_trx: 0, success_trx: 0, failed_trx: 0, total_omset: 0, total_laba: 0, unique_products: 0 };
+        const successRate = stats.total_trx > 0 ? parseFloat(((stats.success_trx / stats.total_trx) * 100).toFixed(1)) : 0.0;
+
+        // Query 1.5: Get ALL products sorted by total sales for bar chart (paginated on frontend)
+        const allProductsQuery = `
+            SELECT 
+                t.kode_produk as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx,
+                SUM(CASE WHEN t.status IN (40, 50, 52, 54, 55) THEN 1 ELSE 0 END) as failed_trx,
+                SUM(CASE WHEN t.status = 20 THEN ISNULL(t.harga - t.harga_beli, 0) ELSE 0 END) as total_profit
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY t.kode_produk
+            ORDER BY total_trx DESC
+        `;
+        const allProductsResult = await buildRequestWithParams().query(allProductsQuery);
+
+        // Query 1.6: Get Top 5 Produk
+        const topProductsQuery = `
+            SELECT TOP 5 
+                t.kode_produk as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY t.kode_produk
+            ORDER BY total_trx DESC
+        `;
+        const topProductsResult = await buildRequestWithParams().query(topProductsQuery);
+
+        // Query 1.7: Get Top 5 Modul
+        const topModulesQuery = `
+            SELECT TOP 5 
+                ISNULL(m.label, 'Unknown') as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY m.label
+            ORDER BY total_trx DESC
+        `;
+        const topModulesResult = await buildRequestWithParams().query(topModulesQuery);
+
+        // Query 1.8: Get Top 5 Reseller
+        const topResellersQuery = `
+            SELECT TOP 5 
+                ISNULL(r.nama, 'Unknown') as name,
+                COUNT(*) as total_trx,
+                SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            GROUP BY r.nama
+            ORDER BY total_trx DESC
+        `;
+        const topResellersResult = await buildRequestWithParams().query(topResellersQuery);
+
+        // Query 2: Get paginated transaction records
+        const dataQuery = `
+            SELECT 
+                t.kode as TrxID,
+                t.tgl_entri,
+                t.tgl_status,
+                t.kode_produk,
+                t.tujuan,
+                t.sn,
+                r.nama as nama_reseller,
+                t.status,
+                m.label as nama_modul,
+                t.harga_beli,
+                t.harga,
+                (CASE WHEN t.status = 20 THEN (t.harga - t.harga_beli) ELSE 0 END) as laba,
+                t.keterangan as jawaban_provider
+            FROM transaksi t
+            LEFT JOIN modul m ON t.kode_modul = m.kode
+            LEFT JOIN reseller r ON t.kode_reseller = r.kode
+            ${whereClause}
+            ORDER BY t.tgl_entri DESC
+            OFFSET @offset ROWS
+            FETCH NEXT @limit ROWS ONLY
+        `;
+        const dataResult = await buildRequestWithParams()
+            .input("offset", sql.Int, offset)
+            .input("limit", sql.Int, limit)
+            .query(dataQuery);
+
+        // Derive product-focused stats from allProducts
+        const allProducts = allProductsResult.recordset || [];
+        const topProduct = allProducts.length > 0 ? allProducts[0] : null;
+        const topProductProfit = topProduct ? (topProduct.total_profit || 0) : 0;
+        const avgTrxPerProduct = (stats.unique_products || 0) > 0 ? Math.round((stats.total_trx || 0) / stats.unique_products) : 0;
+
+        res.json({
+            data: dataResult.recordset,
+            productivity: {
+                totalTrx: stats.total_trx || 0,
+                successTrx: stats.success_trx || 0,
+                failedTrx: stats.failed_trx || 0,
+                successRate: successRate,
+                totalOmset: stats.total_omset || 0,
+                totalLaba: stats.total_laba || 0,
+                uniqueProducts: stats.unique_products || 0,
+                topProduct: topProduct ? topProduct.name : '-',
+                topProductTrx: topProduct ? topProduct.total_trx : 0,
+                topProductProfit: topProductProfit,
+                avgTrxPerProduct: avgTrxPerProduct
+            },
+            allProducts: allProducts,
+            topLists: {
+                products: topProductsResult.recordset,
+                modules: topModulesResult.recordset,
+                resellers: topResellersResult.recordset
+            },
+            pagination: {
+                page,
+                limit,
+                total: stats.total_trx || 0,
+                totalPages: Math.ceil((stats.total_trx || 0) / limit)
+            }
+        });
+
+    } catch (err) {
+        console.error("API Error /api/product/transactions:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/modul/init (Get active modules and resellers for table filters)
 app.get("/api/modul/init", async (req, res) => {
     try {
@@ -1737,6 +2069,7 @@ app.get("/api/modul/transactions", async (req, res) => {
         const status = req.query.status || "";
         const startDate = req.query.startDate || "";
         const endDate = req.query.endDate || "";
+        const dateMode = req.query.dateMode || "";
         const sn_empty = req.query.sn_empty || "true";
 
         const pool = await sql.connect(config);
@@ -1746,24 +2079,26 @@ app.get("/api/modul/transactions", async (req, res) => {
 
         // 1. Date Range filter (Required to limit query size and avoid timeouts)
         let start, end;
-        if (startDate && endDate) {
-            const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
-            start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
+        if (dateMode !== "all") {
+            if (startDate && endDate) {
+                const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+                start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
 
-            const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
-            end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
-        } else {
-            // Default range: Today & Yesterday
-            const today = new Date();
-            const yesterday = new Date();
-            yesterday.setDate(today.getDate() - 1);
-            
-            start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0, 0);
-            end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+                const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+                end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+            } else {
+                // Default range: Today & Yesterday
+                const today = new Date();
+                const yesterday = new Date();
+                yesterday.setDate(today.getDate() - 1);
+                
+                start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0, 0);
+                end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+            }
+            conditions.push("t.tgl_entri >= @startDate AND t.tgl_entri <= @endDate");
+            request.input("startDate", sql.DateTime2, start);
+            request.input("endDate", sql.DateTime2, end);
         }
-        conditions.push("t.tgl_entri >= @startDate AND t.tgl_entri <= @endDate");
-        request.input("startDate", sql.DateTime2, start);
-        request.input("endDate", sql.DateTime2, end);
 
         // 2. Search query filter
         if (search) {
@@ -1803,8 +2138,8 @@ app.get("/api/modul/transactions", async (req, res) => {
 
         const buildRequestWithParams = () => {
             const req = pool.request();
-            req.input("startDate", sql.DateTime2, start);
-            req.input("endDate", sql.DateTime2, end);
+            if (start) req.input("startDate", sql.DateTime2, start);
+            if (end) req.input("endDate", sql.DateTime2, end);
             if (search) req.input("search", sql.VarChar, `%${search}%`);
             if (modul) req.input("modul", sql.Int, parseInt(modul));
             if (reseller) req.input("reseller", sql.VarChar, reseller);

@@ -41,7 +41,7 @@
         }
     </script>
     <!-- Custom Style Sheet for shared design properties -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
     <style>
         /* Hide scrollbars for live feed and table container */
         .no-scrollbar::-webkit-scrollbar {
@@ -139,6 +139,10 @@
                     <i class="fa-solid fa-cubes"></i>
                     <span>Modul</span>
                 </a>
+                <a href="product" class="nav-item" id="nav-product">
+                    <i class="fa-solid fa-box"></i>
+                    <span>Product</span>
+                </a>
                 <a href="member" class="nav-item" id="nav-member">
                     <i class="fa-solid fa-users"></i>
                     <span>Member</span>
@@ -185,13 +189,9 @@
                 <div class="flex items-center gap-2">
                     <label for="filter-date-range" class="text-xs font-bold text-slate-400 uppercase tracking-wider">Date Range</label>
                     <select id="filter-date-range" class="px-4 py-2 text-xs font-semibold rounded-full border border-lightBorder dark:border-darkBorder bg-white dark:bg-darkCard text-[#475569] dark:text-[#94a3b8] outline-none cursor-pointer hover:border-brandBlue transition-all shadow-sm duration-200">
-                        <option value="today" selected>Today</option>
-                        <option value="yesterday">Yesterday</option>
-                        <option value="7days">Last 7 Days</option>
-                        <option value="30days">Last 30 Days</option>
-                        <option value="thismonth">This Month</option>
-                        <option value="lastmonth">Last Month</option>
-                        <option value="custom">Custom Range</option>
+                        <option value="today" selected>Hari Ini</option>
+                        <option value="all">Semua Tanggal</option>
+                        <option value="custom">Custom Date</option>
                     </select>
                 </div>
 
@@ -607,9 +607,9 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom Page Script -->
-    <script src="analytics.js"></script>
+    <script src="js/analytics.js"></script>
     <!-- System Log Widget -->
-    <script src="system-log-widget.js"></script>
+    <script src="js/system-log-widget.js"></script>
 </body>
 
 </html>
