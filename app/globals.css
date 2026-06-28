@@ -1903,3 +1903,39 @@ input:checked+.slider:before {
     border-color: #3b82f6;
     box-shadow: 0 2px 8px rgba(59,130,246,0.3);
 }
+
+/* ===== Modul Leaderboard Progress List ===== */
+.progress-row-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    transition: all 0.2s ease-in-out;
+    background: rgba(100, 116, 139, 0.02);
+}
+.progress-row-item:hover {
+    transform: translateX(4px);
+    background: rgba(0, 82, 255, 0.04);
+}
+.dark .progress-row-item:hover {
+    background: rgba(0, 82, 255, 0.08);
+}
+
+/* ===== Compact Modul Page Table ===== */
+#transactions-table th {
+    padding: 10px 8px;
+    font-size: 0.65rem;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+#transactions-table td {
+    padding: 10px 8px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+}
+#transactions-table .badge {
+    padding: 3px 8px;
+    font-size: 0.68rem;
+    gap: 4px;
+}

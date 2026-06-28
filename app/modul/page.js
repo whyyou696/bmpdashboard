@@ -1,6 +1,19 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Bar, Doughnut } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+  ArcElement
+} from 'chart.js';
+
+// Register Chart.js elements
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend, ArcElement);
 
 export default function ModulPage() {
   const [mounted, setMounted] = useState(false);
@@ -195,40 +208,126 @@ export default function ModulPage() {
     }
   };
 
-  // Render horizontal visual progress list
-  const renderProgressList = (title, items) => {
-    // Find max transactions to scale progress bars relative to top volume
-    const maxTx = items.length > 0 ? Math.max(...items.map(i => i.total_trx)) : 1;
+  // Modules Doughnut Data
+  const modulesDoughnutData = {
+    labels: topLists.modules.map(m => m.name),
+    datasets: [
+      {
+        data: topLists.modules.map(m => m.total_trx),
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',  // blue
+          'rgba(6, 182, 212, 0.8)',   // cyan
+          'rgba(16, 185, 129, 0.8)',  // green
+          'rgba(245, 158, 11, 0.8)',  // yellow/amber
+          'rgba(236, 72, 153, 0.8)'   // pink
+        ],
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        hoverOffset: 6
+      }
+    ]
+  };
 
-    return (
-      <div className="bg-white dark:bg-darkCard p-5 rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm relative overflow-hidden flex flex-col hover:border-brandBlue/15 transition-all">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">{title}</h3>
-        <div className="space-y-4 flex-grow">
-          {items.length === 0 ? (
-            <div className="text-center py-6 text-slate-400">No items available</div>
-          ) : (
-            items.map((item, idx) => {
-              const pct = maxTx > 0 ? (item.total_trx / maxTx) * 100 : 0;
-              const successRate = item.total_trx > 0 ? ((item.success_trx / item.total_trx) * 100).toFixed(1) : 0;
-              return (
-                <div key={item.name + idx} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold">{item.name}</span>
-                    <span className="text-[10px] text-slate-400 font-bold">{item.total_trx} Trx (SR: {successRate}%)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-brandBlue h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${pct}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    );
+  const modulesDoughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#94a3b8',
+          font: { family: 'Inter', size: 10, weight: '500' },
+          padding: 10,
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((sum, v) => sum + v, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return ` ${label}: ${value} Trx (${percentage}%)`;
+          }
+        }
+      }
+    },
+    cutout: '65%'
+  };
+
+  // Products Horizontal Bar Data
+  const productsBarData = {
+    labels: topLists.products.map(p => p.name),
+    datasets: [
+      {
+        data: topLists.products.map(p => p.total_trx),
+        backgroundColor: 'rgba(6, 182, 212, 0.75)',
+        hoverBackgroundColor: '#06b6d4',
+        borderRadius: 4
+      }
+    ]
+  };
+
+  const productsBarOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context) => ` ${context.raw} Trx`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(148, 163, 184, 0.05)' },
+        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 9 } }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 9 } }
+      }
+    }
+  };
+
+  // Resellers Vertical Bar Data
+  const resellersBarData = {
+    labels: topLists.resellers.map(r => r.name),
+    datasets: [
+      {
+        data: topLists.resellers.map(r => r.total_trx),
+        backgroundColor: 'rgba(59, 130, 246, 0.75)',
+        hoverBackgroundColor: '#3b82f6',
+        borderRadius: 4
+      }
+    ]
+  };
+
+  const resellersBarOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context) => ` ${context.raw} Trx`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 9 } }
+      },
+      y: {
+        grid: { color: 'rgba(148, 163, 184, 0.05)' },
+        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 9 } }
+      }
+    }
   };
 
   return (
@@ -263,11 +362,52 @@ export default function ModulPage() {
         </div>
       </section>
 
-      {/* Progress list boxes for top metrics */}
+      {/* Visual Charts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ marginTop: '20px' }}>
-        {renderProgressList('Top 5 Modules By Volume', topLists.modules)}
-        {renderProgressList('Top 5 Products By Volume', topLists.products)}
-        {renderProgressList('Top 5 Resellers By Volume', topLists.resellers)}
+        {/* Modules Doughnut */}
+        <div 
+          className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
+          style={{ padding: '32px' }}
+        >
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Modules By Volume</h3>
+          <div className="h-48 relative flex items-center justify-center">
+            {topLists.modules.length > 0 ? (
+              <Doughnut data={modulesDoughnutData} options={modulesDoughnutOptions} />
+            ) : (
+              <span className="text-slate-400 text-xs">No data available</span>
+            )}
+          </div>
+        </div>
+
+        {/* Products Horizontal Bar */}
+        <div 
+          className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
+          style={{ padding: '32px' }}
+        >
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Products By Volume</h3>
+          <div className="h-48 relative">
+            {topLists.products.length > 0 ? (
+              <Bar data={productsBarData} options={productsBarOptions} />
+            ) : (
+              <span className="text-slate-400 text-xs">No data available</span>
+            )}
+          </div>
+        </div>
+
+        {/* Resellers Vertical Bar */}
+        <div 
+          className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
+          style={{ padding: '32px' }}
+        >
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Resellers By Volume</h3>
+          <div className="h-48 relative">
+            {topLists.resellers.length > 0 ? (
+              <Bar data={resellersBarData} options={resellersBarOptions} />
+            ) : (
+              <span className="text-slate-400 text-xs">No data available</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Filters and logs table */}
@@ -277,6 +417,7 @@ export default function ModulPage() {
             <i className="fa-solid fa-magnifying-glass search-icon"></i>
             <input
               type="text"
+              id="search-input"
               placeholder="Search by destination, product, TRXID, reseller..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}

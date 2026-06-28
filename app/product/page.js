@@ -247,10 +247,18 @@ export default function ProductPage() {
       {
         label: 'Total Txs Volume',
         data: chartTxCounts,
-        backgroundColor: 'rgba(37, 99, 235, 0.65)',
-        borderColor: '#2563eb',
-        borderWidth: 1,
-        borderRadius: 4
+        backgroundColor: 'rgba(59, 130, 246, 0.75)',
+        hoverBackgroundColor: '#3b82f6',
+        borderRadius: 4,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Total Profit',
+        data: chartProfit,
+        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+        hoverBackgroundColor: '#10b981',
+        borderRadius: 4,
+        yAxisID: 'y1'
       }
     ]
   };
@@ -259,14 +267,30 @@ export default function ProductPage() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: {
+        position: 'top',
+        labels: {
+          color: textColor,
+          font: { family: 'Inter', size: 10, weight: '500' },
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
       tooltip: {
         callbacks: {
+          label: (context) => {
+            const label = context.dataset.label || '';
+            const val = context.raw || 0;
+            if (context.datasetIndex === 1) {
+              return ` ${label}: ${formatCurrency(val)}`;
+            }
+            return ` ${label}: ${val} Trx`;
+          },
           afterBody: (context) => {
             const index = context[0].dataIndex;
             const item = currentChartProducts[index];
             if (item) {
-              return `Success Rate: ${((item.success_trx / item.total_trx) * 100).toFixed(1)}%\nProfit: ${formatCurrency(item.total_profit)}`;
+              return `Success Rate: ${((item.success_trx / item.total_trx) * 100).toFixed(1)}%`;
             }
             return '';
           }
@@ -287,8 +311,26 @@ export default function ProductPage() {
         ticks: { color: textColor, font: { family: 'Inter', size: 9 } }
       },
       y: {
+        type: 'linear',
+        display: true,
+        position: 'left',
         grid: { color: gridColor },
-        ticks: { color: textColor, font: { family: 'Inter', size: 9 } }
+        ticks: { 
+          color: textColor, 
+          font: { family: 'Inter', size: 9 },
+          callback: (value) => value + ' Trx'
+        }
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: { 
+          color: textColor, 
+          font: { family: 'Inter', size: 9 },
+          callback: (value) => 'Rp ' + (value >= 1000 ? (value / 1000) + 'k' : value)
+        }
       }
     }
   };
@@ -300,7 +342,7 @@ export default function ProductPage() {
         <div className="stat-card" id="card-total">
           <div className="stat-icon-wrapper total"><i className="fa-solid fa-box"></i></div>
           <div className="stat-info">
-            <span className="stat-label">Unique Products</span>
+            <span className="stat-label">Jumlah Product</span>
             <h2 className="stat-value">{productivity.uniqueProducts.toLocaleString('id-ID')}</h2>
             <span className="stat-meta">Active product codes</span>
           </div>
@@ -325,11 +367,11 @@ export default function ProductPage() {
         </div>
 
         <div className="stat-card" id="card-canceled">
-          <div className="stat-icon-wrapper wrong-number"><i className="fa-solid fa-arrow-trend-up"></i></div>
+          <div className="stat-icon-wrapper retail"><i className="fa-solid fa-wallet"></i></div>
           <div className="stat-info">
-            <span className="stat-label">Avg Transaction / Product</span>
-            <h2 className="stat-value">{productivity.avgTrxPerProduct.toLocaleString('id-ID')}</h2>
-            <span className="stat-meta">Average density</span>
+            <span className="stat-label">Jumlah Profit Product</span>
+            <h2 className="stat-value text-indigo">{formatCurrency(productivity.totalLaba)}</h2>
+            <span className="stat-meta">Total profit margins</span>
           </div>
         </div>
       </section>
@@ -390,6 +432,7 @@ export default function ProductPage() {
             <i className="fa-solid fa-magnifying-glass search-icon"></i>
             <input
               type="text"
+              id="search-input"
               placeholder="Search by destination, product, TRXID, reseller..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}

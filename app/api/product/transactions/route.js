@@ -221,17 +221,18 @@ export async function GET(request) {
   } catch (err) {
     console.warn("SQL transaction list failed, returning mock data.");
     
+    // Generate 500 mock records
     const mockList = [];
-    const products = ['XLDP2', 'TSEL5', 'ML10', 'AXIS5', 'TRI10'];
+    const products = ['XLDP2', 'TSEL5', 'ML10', 'AXIS5', 'TRI10', 'PLN20', 'PLN50', 'DANA10', 'OVO10', 'GOPAY10'];
     const modules = [
       { kode: 1, label: 'DIGIPOS AUTO 1' },
       { kode: 2, label: 'KAWAN SEJAGAT' },
       { kode: 3, label: 'METRO SUP' }
     ];
     const resellers = [
-      { kode: 'R01', nama: 'Indo Cell' },
-      { kode: 'R02', nama: 'Best Multipayment' },
-      { kode: 'R03', nama: 'Media Cell' }
+      { kode: 'R001', nama: 'Indo Cell' },
+      { kode: 'R002', nama: 'Best Multipayment' },
+      { kode: 'R003', nama: 'Metro Pulsa' }
     ];
     const statuses = [20, 20, 20, 40, 50, 55, 20, 0, 2];
 
@@ -272,11 +273,13 @@ export async function GET(request) {
     // 1. Date filter
     if (dateMode !== 'all') {
       if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate + 'T23:59:59.999');
         filtered = filtered.filter(t => {
           const d = new Date(t.tgl_entri);
-          return d >= start && d <= end;
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const localDateStr = `${yyyy}-${mm}-${dd}`;
+          return localDateStr >= startDate && localDateStr <= endDate;
         });
       }
     }
@@ -369,10 +372,10 @@ export async function GET(request) {
       }
     });
 
-    const topProducts = Object.entries(productCounts)
+    const chartProducts = Object.entries(productCounts)
       .map(([name, count]) => ({ name, total_trx: count, success_trx: Math.round(count * 0.8) }))
-      .sort((a, b) => b.total_trx - a.total_trx)
-      .slice(0, 5);
+      .sort((a, b) => b.total_trx - a.total_trx);
+    const topProducts = chartProducts.slice(0, 5);
 
     const modCounts = {};
     filtered.forEach(t => {
@@ -409,7 +412,7 @@ export async function GET(request) {
         topProductProfit: Math.round(totalLaba * 0.4),
         avgTrxPerProduct: uniqueProducts > 0 ? Math.round(totalTrx / uniqueProducts) : 0
       },
-      allProducts: topProducts.map(p => ({ ...p, success_trx: p.success_trx, failed_trx: p.total_trx - p.success_trx, total_profit: Math.round(p.total_trx * 500) })),
+      allProducts: chartProducts.map(p => ({ ...p, success_trx: p.success_trx, failed_trx: p.total_trx - p.success_trx, total_profit: Math.round(p.total_trx * 500) })),
       topLists: {
         products: topProducts,
         modules: topModules,

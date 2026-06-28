@@ -92,12 +92,25 @@ export async function GET(request) {
     const stats = statsResult.recordset[0] || { total_trx: 0, success_trx: 0, failed_trx: 0, total_omset: 0, total_laba: 0 };
     const successRate = stats.total_trx > 0 ? parseFloat(((stats.success_trx / stats.total_trx) * 100).toFixed(1)) : 0.0;
 
-    let saldoQuery = "SELECT SUM(saldo) as total_saldo FROM modul WHERE deleted = 0 AND aktif = 1";
-    if (modul) saldoQuery += " AND kode = @modul_id";
-    const saldoReq = pool.request();
-    if (modul) saldoReq.input("modul_id", sql.Int, parseInt(modul));
-    const saldoResult = await saldoReq.query(saldoQuery);
-    const totalSaldo = saldoResult.recordset[0].total_saldo || 0;
+    let totalSaldo = 0;
+    if (whereClause !== "") {
+      const saldoQuery = `
+        SELECT SUM(m.saldo) as total_saldo 
+        FROM modul m 
+        WHERE m.kode IN (
+          SELECT DISTINCT t.kode_modul 
+          FROM transaksi t
+          LEFT JOIN modul m_inner ON t.kode_modul = m_inner.kode
+          LEFT JOIN reseller r ON t.kode_reseller = r.kode
+          \${whereClause}
+        )
+      `;
+      const saldoResult = await buildRequestWithParams().query(saldoQuery);
+      totalSaldo = saldoResult.recordset[0].total_saldo || 0;
+    } else {
+      const saldoResult = await pool.request().query("SELECT SUM(saldo) as total_saldo FROM modul WHERE deleted = 0 AND aktif = 1");
+      totalSaldo = saldoResult.recordset[0].total_saldo || 0;
+    }
 
     const topModulesQuery = `
       SELECT TOP 5 ISNULL(m.label, 'Unknown') as name, COUNT(*) as total_trx, SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx
@@ -311,6 +324,19 @@ export async function GET(request) {
       .sort((a, b) => b.total_trx - a.total_trx)
       .slice(0, 5);
 
+    // Define mock balances for each module
+    const moduleBalances = {
+      1: 45000000,
+      2: 35000000,
+      3: 25000000,
+      4: 15000000,
+      5: 10000000
+    };
+
+    // Calculate dynamic totalSaldo from unique modules in the filtered list
+    const uniqueModuleKodes = [...new Set(filtered.map(t => t.kode_modul))];
+    const totalSaldo = uniqueModuleKodes.reduce((sum, kode) => sum + (moduleBalances[kode] || 0), 0);
+
     const paginated = filtered.slice(offset, offset + limit);
 
     return NextResponse.json({
@@ -322,7 +348,7 @@ export async function GET(request) {
         successRate: totalTrx > 0 ? parseFloat(((successTrx / totalTrx) * 100).toFixed(1)) : 0.0,
         totalOmset,
         totalLaba,
-        totalSaldo: 125000000
+        totalSaldo
       },
       topLists: {
         modules: topModules,
