@@ -6,6 +6,18 @@ export async function GET(request) {
   const range = searchParams.get('range') || '30days';
   const startDate = searchParams.get('startDate') || '';
   const endDate = searchParams.get('endDate') || '';
+  const status = searchParams.get('status') || '';
+  const product = searchParams.get('product') || '';
+  const search = searchParams.get('search') || '';
+
+  const getLocalDateString = (isoStr) => {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
   // Standard date ranges generator helper
   const getDateRanges = (range, startStr, endStr) => {
@@ -63,6 +75,29 @@ export async function GET(request) {
     dbRequest.input("prevEnd", sql.DateTime2, prevEnd);
     dbRequest.input("todayStart", sql.DateTime2, todayStart);
 
+    let extraConditions = [];
+    if (status && status !== 'all') {
+      if (status === 'sukses') {
+        extraConditions.push("status = 20");
+      } else if (status === 'gagal') {
+        extraConditions.push("status IN (40, 50, 52, 54, 55)");
+      } else if (status === 'proses') {
+        extraConditions.push("status IN (0, 1, 2)");
+      } else if (!isNaN(parseInt(status))) {
+        extraConditions.push("status = @status");
+        dbRequest.input("status", sql.Int, parseInt(status));
+      }
+    }
+    if (product && product !== 'all') {
+      extraConditions.push("kode_produk = @product");
+      dbRequest.input("product", sql.VarChar, product);
+    }
+    if (search) {
+      extraConditions.push("(tujuan LIKE @search OR kode_produk LIKE @search OR sn LIKE @search OR CAST(kode AS VARCHAR) LIKE @search)");
+      dbRequest.input("search", sql.VarChar, `%${search}%`);
+    }
+    const extraWhere = extraConditions.length > 0 ? " AND " + extraConditions.join(" AND ") : "";
+
     const query = `
       SELECT
         SUM(CASE WHEN tgl_entri >= @currStart AND tgl_entri <= @currEnd THEN 1 ELSE 0 END) as currTotal,
@@ -79,8 +114,9 @@ export async function GET(request) {
         SUM(CASE WHEN tgl_entri >= @todayStart AND status = 20 THEN CAST(ISNULL(harga, 0) AS BIGINT) ELSE 0 END) as todayRevenue,
         SUM(CASE WHEN tgl_entri >= @todayStart AND status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as todayProfit
       FROM transaksi
-      WHERE (tgl_entri >= @currStart AND tgl_entri <= @currEnd)
-         OR (tgl_entri >= @prevStart AND tgl_entri <= @prevEnd)
+      WHERE ((tgl_entri >= @currStart AND tgl_entri <= @currEnd)
+         OR (tgl_entri >= @prevStart AND tgl_entri <= @prevEnd))
+         ${extraWhere}
     `;
 
     const result = await dbRequest.query(query);
@@ -104,7 +140,7 @@ export async function GET(request) {
       trendQuery = `
         SELECT DATEPART(hour, tgl_entri) as label, COUNT(*) as txs, SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) as bigint) ELSE 0 END) as profit
         FROM transaksi
-        WHERE tgl_entri >= @currStart AND tgl_entri <= @currEnd
+        WHERE tgl_entri >= @currStart AND tgl_entri <= @currEnd ${extraWhere}
         GROUP BY DATEPART(hour, tgl_entri)
         ORDER BY label ASC
       `;
@@ -112,7 +148,7 @@ export async function GET(request) {
       trendQuery = `
         SELECT CONVERT(date, tgl_entri) as label, COUNT(*) as txs, SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) as bigint) ELSE 0 END) as profit
         FROM transaksi
-        WHERE tgl_entri >= @currStart AND tgl_entri <= @currEnd
+        WHERE tgl_entri >= @currStart AND tgl_entri <= @currEnd ${extraWhere}
         GROUP BY CONVERT(date, tgl_entri)
         ORDER BY label ASC
       `;
@@ -141,40 +177,124 @@ export async function GET(request) {
   } catch (err) {
     console.warn("SQL connection failed, falling back to mock KPIs.");
     
-    let totalTx = 1824443;
-    let totalRev = 28232278331;
-    let totalProf = 1201030372;
-    let txSpark = [120, 140, 135, 150, 165, 155, 170, 185, 180, 195];
-    let revSpark = [1500000, 1600000, 1550000, 1700000, 1850000, 1800000, 1900000, 2050000, 1950000, 2150000];
-    let profSpark = [70000, 75000, 72000, 80000, 85000, 82000, 88000, 95000, 90000, 102000];
+    const mockList = [];
+    const products = ['XLDP2', 'TSEL5', 'ML10', 'AXIS5', 'TRI10', 'PLN20', 'PLN50', 'DANA10', 'OVO10', 'GOPAY10'];
+    const statuses = [20, 20, 20, 40, 50, 55, 20, 0, 2];
     
-    if (range === 'today') {
-      totalTx = 5824;
-      totalRev = 87500000;
-      totalProf = 4235000;
-      txSpark = [12, 14, 13, 15, 16, 15, 17, 18, 18, 19];
-      revSpark = [60, 80, 75, 90, 85, 95, 100, 110, 105, 120].map(x => x * 70000);
-      profSpark = [40, 50, 45, 55, 50, 60, 65, 75, 70, 80].map(x => x * 5000);
-    } else if (range === 'custom' && startDate && endDate) {
-      const diffDays = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)));
-      totalTx = Math.min(1824443, 5824 * diffDays);
-      totalRev = Math.min(28232278331, 87500000 * diffDays);
-      totalProf = Math.min(1201030372, 4235000 * diffDays);
-      // scale sparklines
-      txSpark = txSpark.map(x => Math.round(x * Math.min(1, diffDays / 30)));
-      revSpark = revSpark.map(x => Math.round(x * Math.min(1, diffDays / 30)));
-      profSpark = profSpark.map(x => Math.round(x * Math.min(1, diffDays / 30)));
+    const todayMs = Date.now();
+    for (let i = 0; i < 500; i++) {
+      const idx = i + 1;
+      const statusVal = statuses[i % statuses.length];
+      const price = statusVal === 20 ? 15000 + (i % 5) * 5000 : (statusVal === 0 || statusVal === 2 ? 15000 : 0);
+      const cost = statusVal === 20 ? price - 500 - (i % 3) * 150 : (statusVal === 0 || statusVal === 2 ? 14500 : 0);
+      const laba = statusVal === 20 ? price - cost : 0;
+      const dateVal = new Date(todayMs - (i * 300000));
+      
+      mockList.push({
+        TrxID: 1828625 - idx,
+        tgl_entri: dateVal.toISOString(),
+        status: statusVal,
+        kode_produk: products[i % products.length],
+        tujuan: '0812' + String(10000000 + (i * 17) % 89999999),
+        sn: statusVal === 20 ? 'TXSN' + String(1000000 + (i * 31) % 899999) : 'N/A',
+        harga: price,
+        harga_beli: cost,
+        laba: laba
+      });
     }
-    
+
+    let filtered = [...mockList];
+
+    // Status filter
+    if (status && status !== 'all') {
+      if (status === 'sukses') {
+        filtered = filtered.filter(t => t.status === 20);
+      } else if (status === 'gagal') {
+        filtered = filtered.filter(t => [40, 50, 52, 54, 55].includes(t.status));
+      } else if (status === 'proses') {
+        filtered = filtered.filter(t => [0, 1, 2].includes(t.status));
+      } else if (!isNaN(parseInt(status))) {
+        filtered = filtered.filter(t => t.status === parseInt(status));
+      }
+    }
+
+    // Product filter
+    if (product && product !== 'all') {
+      filtered = filtered.filter(t => t.kode_produk === product);
+    }
+
+    // Search filter
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(t => 
+        String(t.TrxID).includes(q) ||
+        (t.tujuan && t.tujuan.includes(q)) ||
+        (t.kode_produk && t.kode_produk.toLowerCase().includes(q)) ||
+        (t.sn && t.sn.toLowerCase().includes(q))
+      );
+    }
+
+    const currList = filtered.filter(t => new Date(t.tgl_entri) >= currentStart && new Date(t.tgl_entri) <= currentEnd);
+    const prevList = filtered.filter(t => new Date(t.tgl_entri) >= prevStart && new Date(t.tgl_entri) <= prevEnd);
+    const todayList = filtered.filter(t => getLocalDateString(t.tgl_entri) === getLocalDateString(todayMs));
+
+    const currTotalVal = currList.length;
+    const currSuccessVal = currList.filter(t => t.status === 20).length;
+    const currRevenue = currList.filter(t => t.status === 20).reduce((sum, t) => sum + t.harga, 0);
+    const currProfit = currList.filter(t => t.status === 20).reduce((sum, t) => sum + t.laba, 0);
+    const currSuccessRate = currTotalVal > 0 ? (currSuccessVal / currTotalVal * 100) : 0;
+
+    const prevTotalVal = prevList.length;
+    const prevSuccessVal = prevList.filter(t => t.status === 20).length;
+    const prevRevenue = prevList.filter(t => t.status === 20).reduce((sum, t) => sum + t.harga, 0);
+    const prevProfit = prevList.filter(t => t.status === 20).reduce((sum, t) => sum + t.laba, 0);
+    const prevSuccessRate = prevTotalVal > 0 ? (prevSuccessVal / prevTotalVal * 100) : 0;
+
+    const totalTxGrowth = prevTotalVal > 0 ? ((currTotalVal - prevTotalVal) / prevTotalVal * 100) : 12.5;
+    const revenueGrowth = prevRevenue > 0 ? ((currRevenue - prevRevenue) / prevRevenue * 100) : 10.3;
+    const profitGrowth = prevProfit > 0 ? ((currProfit - prevProfit) / prevProfit * 100) : 8.2;
+    const successRateGrowth = currSuccessRate - prevSuccessRate;
+
+    const todayRevenueVal = todayList.filter(t => t.status === 20).reduce((sum, t) => sum + t.harga, 0);
+    const todayProfitVal = todayList.filter(t => t.status === 20).reduce((sum, t) => sum + t.laba, 0);
+
+    let txSparkline = [];
+    let profitSparkline = [];
+    if (range === 'today') {
+      const hourlyData = Array(24).fill(0).map(() => ({ txs: 0, profit: 0 }));
+      currList.forEach(t => {
+        const h = new Date(t.tgl_entri).getHours();
+        hourlyData[h].txs += 1;
+        if (t.status === 20) hourlyData[h].profit += t.laba;
+      });
+      txSparkline = hourlyData.map(d => d.txs);
+      profitSparkline = hourlyData.map(d => d.profit);
+    } else {
+      const dailyMap = {};
+      currList.forEach(t => {
+        const dStr = getLocalDateString(t.tgl_entri);
+        if (!dailyMap[dStr]) dailyMap[dStr] = { txs: 0, profit: 0 };
+        dailyMap[dStr].txs += 1;
+        if (t.status === 20) dailyMap[dStr].profit += t.laba;
+      });
+      const sortedDates = Object.keys(dailyMap).sort();
+      txSparkline = sortedDates.map(d => dailyMap[d].txs);
+      profitSparkline = sortedDates.map(d => dailyMap[d].profit);
+      if (txSparkline.length === 0) {
+        txSparkline = [0];
+        profitSparkline = [0];
+      }
+    }
+
     return NextResponse.json({
       isDemo: true,
       kpis: {
-        totalTransactions: { value: totalTx, growth: 12.5, sparkline: txSpark },
-        totalRevenue: { value: totalRev, growth: 10.3, sparkline: revSpark },
-        totalProfit: { value: totalProf, growth: 8.2, sparkline: profSpark },
-        successRate: { value: 74.6, growth: -1.2, sparkline: [75.8, 75.2, 74.9, 75.5, 75.1, 74.8, 74.5, 74.7, 74.4, 74.6] },
-        todayRevenue: { value: 87500000, sparkline: [60, 80, 75, 90, 85, 95, 100, 110, 105, 120] },
-        todayProfit: { value: 4235000, sparkline: [40, 50, 45, 55, 50, 60, 65, 75, 70, 80] }
+        totalTransactions: { value: currTotalVal, growth: parseFloat(totalTxGrowth.toFixed(2)), sparkline: txSparkline },
+        totalRevenue: { value: currRevenue, growth: parseFloat(revenueGrowth.toFixed(2)), sparkline: profitSparkline.map(x => Math.round(x * 20)) },
+        totalProfit: { value: currProfit, growth: parseFloat(profitGrowth.toFixed(2)), sparkline: profitSparkline },
+        successRate: { value: parseFloat(currSuccessRate.toFixed(1)), growth: parseFloat(successRateGrowth.toFixed(1)), sparkline: [75, 76, 75, 74, 75, 74, 75] },
+        todayRevenue: { value: todayRevenueVal || 87500000, sparkline: [60, 80, 75, 90, 85, 95, 100, 110, 105, 120] },
+        todayProfit: { value: todayProfitVal || 4235000, sparkline: [40, 50, 45, 55, 50, 60, 65, 75, 70, 80] }
       }
     });
   }

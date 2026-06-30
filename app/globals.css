@@ -342,6 +342,14 @@ body {
     background: linear-gradient(90deg, #f97316, #d97706);
 }
 
+.stat-card#card-avg-saldo::after {
+    background: linear-gradient(90deg, var(--vivid-cyan), var(--blue));
+}
+
+.stat-card#card-max-saldo::after {
+    background: linear-gradient(90deg, #818cf8, #a855f7);
+}
+
 .stat-card:hover::after {
     opacity: 1;
 }

@@ -104,7 +104,10 @@ export default function Dashboard() {
     try {
       // 1. Fetch stats if updateStats is requested
       if (updateStats && mounted) {
-        const statsParams = new URLSearchParams();
+        const statsParams = new URLSearchParams({
+          status: status,
+          search: search.trim()
+        });
         if (startDateVal && endDateVal) {
           statsParams.append('startDate', startDateVal);
           statsParams.append('endDate', endDateVal);
@@ -116,7 +119,10 @@ export default function Dashboard() {
         }
 
         // 2. Fetch chart data
-        const chartParams = new URLSearchParams();
+        const chartParams = new URLSearchParams({
+          status: status,
+          search: search.trim()
+        });
         if (dateMode === 'all') {
           chartParams.append('dateMode', 'all');
         } else if (startDateVal && endDateVal) {

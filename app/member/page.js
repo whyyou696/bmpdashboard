@@ -17,6 +17,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend, ArcEle
 
 export default function MemberPage() {
   const [mounted, setMounted] = useState(false);
+  const [themeTick, setThemeTick] = useState(0);
 
   // States
   const [originalModules, setOriginalModules] = useState([]);
@@ -67,6 +68,13 @@ export default function MemberPage() {
     return () => window.removeEventListener('bmp-force-sync', handleSync);
   }, [mounted]);
 
+  // Theme Change listener (to force chart update if needed)
+  useEffect(() => {
+    const handleTheme = () => setThemeTick(prev => prev + 1);
+    window.addEventListener('bmp-theme-change', handleTheme);
+    return () => window.removeEventListener('bmp-theme-change', handleTheme);
+  }, []);
+
   const handleReset = () => {
     setSearch('');
     setStatus('all');
@@ -105,15 +113,147 @@ export default function MemberPage() {
   const startIdx = (currentPage - 1) * limit;
   const paginatedModules = filteredModules.slice(startIdx, startIdx + limit);
 
+  // Calculations for supporting cards (dynamic, based on filteredModules)
+  const filteredActiveModules = filteredModules.filter(m => m.aktif === 1);
+  const dynamicTotalSaldo = filteredActiveModules.reduce((sum, m) => sum + (m.saldo || 0), 0);
+  const dynamicPotentialActiveCount = filteredModules.filter(m => m.aktif === 1 && ((m.saldo && m.saldo > 0) || m.total_trx > 0)).length;
+  const dynamicNonPotentialCount = filteredModules.filter(m => m.aktif === 0 || (m.aktif === 1 && (!m.saldo || m.saldo <= 0) && m.total_trx === 0)).length;
+  const dynamicTotalTrx30Days = filteredModules.reduce((sum, m) => sum + (m.total_trx || 0), 0);
+
+  const averageSaldo = filteredActiveModules.length > 0 ? (dynamicTotalSaldo / filteredActiveModules.length) : 0;
+  const highestSaldoModule = filteredModules.reduce((max, m) => (m.saldo > (max?.saldo || 0)) ? m : max, null);
+
+  // Theme support for charts
+  const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  const textColor = isDarkMode ? '#94a3b8' : '#475569';
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
+
+  // Chart 1: Horizontal Bar Chart of Member Balances
+  const sortedModulesByBalance = [...filteredModules].sort((a, b) => b.saldo - a.saldo);
+  const barChartLabels = sortedModulesByBalance.slice(0, 10).map(m => m.label);
+  const barChartValues = sortedModulesByBalance.slice(0, 10).map(m => m.saldo);
+
+  const memberBalanceChartData = {
+    labels: barChartLabels,
+    datasets: [
+      {
+        label: 'Saldo Member',
+        data: barChartValues,
+        backgroundColor: 'rgba(99, 102, 241, 0.75)', // Indigo
+        hoverBackgroundColor: '#6366f1',
+        borderRadius: 4
+      }
+    ]
+  };
+
+  const memberBalanceChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y', // Horizontal Bar Chart
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#f8fafc',
+        bodyColor: '#94a3b8',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8,
+        callbacks: {
+          label: (context) => ` Saldo: ${formatCurrency(context.raw)}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: gridColor },
+        ticks: { 
+          color: textColor, 
+          font: { family: 'Inter', size: 9 },
+          callback: (value) => {
+            if (value >= 1e6) return `Rp ${(value / 1e6).toFixed(0)}Jt`;
+            return `Rp ${value.toLocaleString('id-ID')}`;
+          }
+        }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { color: textColor, font: { family: 'Inter', size: 10 } }
+      }
+    }
+  };
+
+  // Chart 2: Doughnut Chart of Balance Share
+  const doughnutLabels = sortedModulesByBalance.slice(0, 5).map(m => m.label);
+  const doughnutValues = sortedModulesByBalance.slice(0, 5).map(m => m.saldo);
+  if (sortedModulesByBalance.length > 5) {
+    doughnutLabels.push('Lainnya');
+    doughnutValues.push(sortedModulesByBalance.slice(5).reduce((sum, m) => sum + m.saldo, 0));
+  }
+
+  const memberBalanceShareData = {
+    labels: doughnutLabels,
+    datasets: [
+      {
+        data: doughnutValues,
+        backgroundColor: [
+          '#0052ff', // Brand Blue
+          '#06b6d4', // Brand Cyan
+          '#10b981', // Emerald
+          '#f59e0b', // Amber
+          '#818cf8', // Indigo
+          '#94a3b8'  // Slate
+        ],
+        borderWidth: 0
+      }
+    ]
+  };
+
+  const memberBalanceShareOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          color: textColor,
+          font: { family: 'Inter', size: 10 },
+          boxWidth: 10,
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#f8fafc',
+        bodyColor: '#94a3b8',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8,
+        callbacks: {
+          label: (context) => {
+            const value = context.raw;
+            const total = context.dataset.data.reduce((sum, v) => sum + v, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return ` ${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+          }
+        }
+      }
+    },
+    cutout: '65%'
+  };
+
   return (
     <>
       {/* Summary Cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" aria-label="Key Performance Indicators">
+      <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5" aria-label="Key Performance Indicators">
         <div className="stat-card" id="card-total-saldo">
           <div className="stat-icon-wrapper total"><i className="fa-solid fa-wallet"></i></div>
           <div className="stat-info">
             <span className="stat-label">Total Saldo Aktif</span>
-            <h2 className="stat-value text-indigo">{formatCurrency(summary.totalSaldo)}</h2>
+            <h2 className="stat-value text-indigo">{formatCurrency(dynamicTotalSaldo)}</h2>
             <span className="stat-meta">Active suppliers balance</span>
           </div>
         </div>
@@ -122,7 +262,7 @@ export default function MemberPage() {
           <div className="stat-icon-wrapper success"><i className="fa-solid fa-circle-check"></i></div>
           <div className="stat-info">
             <span className="stat-label">Potential Active Modules</span>
-            <h2 className="stat-value text-success">{summary.potentialActiveCount}</h2>
+            <h2 className="stat-value text-success">{dynamicPotentialActiveCount}</h2>
             <span className="stat-meta">Active with transactions</span>
           </div>
         </div>
@@ -131,7 +271,7 @@ export default function MemberPage() {
           <div className="stat-icon-wrapper failed"><i className="fa-solid fa-triangle-exclamation"></i></div>
           <div className="stat-info">
             <span className="stat-label">Inactive / Empty Saldo</span>
-            <h2 className="stat-value text-danger">{summary.nonPotentialCount}</h2>
+            <h2 className="stat-value text-danger">{dynamicNonPotentialCount}</h2>
             <span className="stat-meta">Requires balance top-up</span>
           </div>
         </div>
@@ -140,11 +280,74 @@ export default function MemberPage() {
           <div className="stat-icon-wrapper pending"><i className="fa-solid fa-arrows-spin"></i></div>
           <div className="stat-info">
             <span className="stat-label">Total Trx (30 Days)</span>
-            <h2 className="stat-value">{summary.totalTrx30Days.toLocaleString('id-ID')}</h2>
+            <h2 className="stat-value">{dynamicTotalTrx30Days.toLocaleString('id-ID')}</h2>
             <span className="stat-meta">Gateway traffic volume</span>
           </div>
         </div>
+
+        <div className="stat-card" id="card-avg-saldo">
+          <div className="stat-icon-wrapper retail"><i className="fa-solid fa-calculator"></i></div>
+          <div className="stat-info">
+            <span className="stat-label">Rata-rata Saldo</span>
+            <h2 className="stat-value text-indigo">{formatCurrency(averageSaldo)}</h2>
+            <span className="stat-meta">Avg active member balance</span>
+          </div>
+        </div>
+
+        <div className="stat-card" id="card-max-saldo" style={{ minWidth: 0 }}>
+          <div className="stat-icon-wrapper cost"><i className="fa-solid fa-crown"></i></div>
+          <div className="stat-info" style={{ minWidth: 0 }}>
+            <span className="stat-label">Saldo Tertinggi</span>
+            <h2 className="stat-value text-indigo truncate" style={{ maxWidth: '100%' }}>
+              {highestSaldoModule ? formatCurrency(highestSaldoModule.saldo) : 'Rp 0'}
+            </h2>
+            <span className="stat-meta truncate" style={{ maxWidth: '100%' }} title={highestSaldoModule ? highestSaldoModule.label : 'No active member'}>
+              {highestSaldoModule ? highestSaldoModule.label : 'No active member'}
+            </span>
+          </div>
+        </div>
       </section>
+
+      {/* Visual Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ marginTop: '20px' }}>
+        {/* Chart 1: Reseller Balances */}
+        <div 
+          className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
+          style={{ padding: '24px' }}
+        >
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 font-heading" style={{ letterSpacing: '1px' }}>
+            Saldo per Member (Top 10)
+          </h3>
+          <div className="h-64 relative">
+            {filteredModules.length > 0 ? (
+              <Bar key={`bar-${themeTick}`} data={memberBalanceChartData} options={memberBalanceChartOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                No member data available
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Chart 2: Distribusi Saldo */}
+        <div 
+          className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
+          style={{ padding: '24px' }}
+        >
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 font-heading" style={{ letterSpacing: '1px' }}>
+            Distribusi Saldo Member
+          </h3>
+          <div className="h-64 relative flex items-center justify-center">
+            {filteredModules.length > 0 && filteredModules.some(m => m.saldo > 0) ? (
+              <Doughnut key={`doughnut-${themeTick}`} data={memberBalanceShareData} options={memberBalanceShareOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                No balance distribution data
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Advanced filters and modules table */}
       <section className="table-section" aria-label="Transaction Records" style={{ marginTop: '20px' }}>
@@ -192,7 +395,6 @@ export default function MemberPage() {
           <table id="transactions-table">
             <thead>
               <tr>
-                <th>Modul ID</th>
                 <th>Module Label</th>
                 <th>Target / Tujuan</th>
                 <th>Status</th>
@@ -204,7 +406,7 @@ export default function MemberPage() {
             <tbody>
               {loading ? (
                 <tr className="placeholder-row">
-                  <td colSpan={7}>
+                  <td colSpan={6}>
                     <div className="table-loader-wrapper">
                       <div className="spinner"></div>
                       <span>Fetching supplier report data...</span>
@@ -213,7 +415,7 @@ export default function MemberPage() {
                 </tr>
               ) : paginatedModules.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={6}>
                     <div className="empty-state">
                       <i className="fa-regular fa-folder-open empty-icon"></i>
                       <p>No supplier modules found matching the criteria</p>
@@ -224,7 +426,6 @@ export default function MemberPage() {
                 paginatedModules.map((m) => {
                   return (
                     <tr key={m.kode} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
-                      <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{m.kode}</td>
                       <td className="font-semibold text-slate-700 dark:text-slate-300">{m.label}</td>
                       <td>{m.tujuan || '-'}</td>
                       <td>

@@ -129,7 +129,10 @@ export default function AnalyticsPage() {
     const queryParams = new URLSearchParams({
       range,
       startDate: startVal,
-      endDate: endVal
+      endDate: endVal,
+      search: tableSearch.trim(),
+      product: tableProduct,
+      status: tableStatus
     });
 
     try {
@@ -156,7 +159,10 @@ export default function AnalyticsPage() {
         range,
         view: performanceView,
         startDate: startVal,
-        endDate: endVal
+        endDate: endVal,
+        search: tableSearch.trim(),
+        product: tableProduct,
+        status: tableStatus
       });
       const perfRes = await fetch(`/api/analytics/performance?${perfParams.toString()}`);
       if (perfRes.ok) {
@@ -169,7 +175,10 @@ export default function AnalyticsPage() {
         range,
         sortBy: productSortBy,
         startDate: startVal,
-        endDate: endVal
+        endDate: endVal,
+        search: tableSearch.trim(),
+        product: tableProduct,
+        status: tableStatus
       });
       const prodRes = await fetch(`/api/analytics/top-products?${prodParams.toString()}`);
       if (prodRes.ok) {
@@ -282,19 +291,32 @@ export default function AnalyticsPage() {
     }
   };
 
-  // Trigger BI stats fetch on filter change
+  // Reset table page when filters change
+  useEffect(() => {
+    if (!mounted) return;
+    setTablePage(1);
+  }, [range, startDate, endDate, tableSearch, tableProduct, tableStatus, mounted]);
+
+  // Trigger BI stats and table fetch on filter/pagination changes
   useEffect(() => {
     if (!mounted) return;
     fetchBIStats();
-    setTablePage(1);
     fetchAdvancedTable();
-  }, [range, startDate, endDate, performanceView, productSortBy, mounted]);
-
-  // Trigger table fetch when pagination / table filter change
-  useEffect(() => {
-    if (!mounted) return;
-    fetchAdvancedTable();
-  }, [tablePage, tableLimit, tableSearch, tableProduct, tableStatus, tableSortCol, tableSortDir, mounted]);
+  }, [
+    range,
+    startDate,
+    endDate,
+    performanceView,
+    productSortBy,
+    tablePage,
+    tableLimit,
+    tableSearch,
+    tableProduct,
+    tableStatus,
+    tableSortCol,
+    tableSortDir,
+    mounted
+  ]);
 
   // Initial load
   useEffect(() => {

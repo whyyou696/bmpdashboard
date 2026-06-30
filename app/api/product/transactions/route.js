@@ -249,12 +249,16 @@ export async function GET(request) {
       const laba = statusVal === 20 ? price - cost : 0;
       const dateVal = new Date(todayMs - (i * 300000));
 
+      const prefixes = ['0812', '0818', '0815', '0896'];
+      const pref = prefixes[i % prefixes.length];
+      const tujuan = pref + String(10000000 + (i * 17) % 8999999).slice(0, 8);
+
       mockList.push({
         TrxID: 1828625 - idx,
         tgl_entri: dateVal.toISOString(),
         tgl_status: dateVal.toISOString(),
         kode_produk: prod,
-        tujuan: '0812' + String(10000000 + (i * 17) % 89999999),
+        tujuan: tujuan,
         sn: statusVal === 20 ? 'TXSN' + String(1000000 + (i * 31) % 899999) : (statusVal === 0 || statusVal === 2 ? '' : 'N/A'),
         kode_reseller: res.kode,
         nama_reseller: res.nama,

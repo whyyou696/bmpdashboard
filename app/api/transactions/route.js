@@ -12,6 +12,15 @@ export async function GET(request) {
   const endDate = searchParams.get('endDate') || '';
   const date = searchParams.get('date') || '';
 
+  const getLocalDateString = (isoStr) => {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   try {
     const pool = await getDbConnection();
     const dbRequest = pool.request();
@@ -138,17 +147,14 @@ export async function GET(request) {
 
     // Date range filter
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate + 'T23:59:59.999');
       filtered = filtered.filter(t => {
-        const d = new Date(t.tgl_entri);
-        return d >= start && d <= end;
+        const dateStr = getLocalDateString(t.tgl_entri);
+        return dateStr >= startDate && dateStr <= endDate;
       });
     } else if (date) {
-      const targetDateStr = new Date(date).toDateString();
       filtered = filtered.filter(t => {
-        const d = new Date(t.tgl_entri).toDateString();
-        return d === targetDateStr;
+        const dateStr = getLocalDateString(t.tgl_entri);
+        return dateStr === date;
       });
     }
 
