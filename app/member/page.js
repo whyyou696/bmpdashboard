@@ -261,7 +261,7 @@ export default function MemberPage() {
         <div className="stat-card" id="card-potential-active">
           <div className="stat-icon-wrapper success"><i className="fa-solid fa-circle-check"></i></div>
           <div className="stat-info">
-            <span className="stat-label">Potential Active Modules</span>
+            <span className="stat-label">Potential Active Suppliers</span>
             <h2 className="stat-value text-success">{dynamicPotentialActiveCount}</h2>
             <span className="stat-meta">Active with transactions</span>
           </div>
@@ -290,7 +290,7 @@ export default function MemberPage() {
           <div className="stat-info">
             <span className="stat-label">Rata-rata Saldo</span>
             <h2 className="stat-value text-indigo">{formatCurrency(averageSaldo)}</h2>
-            <span className="stat-meta">Avg active member balance</span>
+            <span className="stat-meta">Avg active supplier balance</span>
           </div>
         </div>
 
@@ -301,8 +301,8 @@ export default function MemberPage() {
             <h2 className="stat-value text-indigo truncate" style={{ maxWidth: '100%' }}>
               {highestSaldoModule ? formatCurrency(highestSaldoModule.saldo) : 'Rp 0'}
             </h2>
-            <span className="stat-meta truncate" style={{ maxWidth: '100%' }} title={highestSaldoModule ? highestSaldoModule.label : 'No active member'}>
-              {highestSaldoModule ? highestSaldoModule.label : 'No active member'}
+            <span className="stat-meta truncate" style={{ maxWidth: '100%' }} title={highestSaldoModule ? highestSaldoModule.label : 'No active supplier'}>
+              {highestSaldoModule ? highestSaldoModule.label : 'No active supplier'}
             </span>
           </div>
         </div>
@@ -316,14 +316,14 @@ export default function MemberPage() {
           style={{ padding: '24px' }}
         >
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 font-heading" style={{ letterSpacing: '1px' }}>
-            Saldo per Member (Top 10)
+            Saldo per Supplier (Top 10)
           </h3>
           <div className="h-64 relative">
             {filteredModules.length > 0 ? (
               <Bar key={`bar-${themeTick}`} data={memberBalanceChartData} options={memberBalanceChartOptions} />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-                No member data available
+                No supplier data available
               </div>
             )}
           </div>
@@ -335,7 +335,7 @@ export default function MemberPage() {
           style={{ padding: '24px' }}
         >
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 font-heading" style={{ letterSpacing: '1px' }}>
-            Distribusi Saldo Member
+            Distribusi Saldo Supplier
           </h3>
           <div className="h-64 relative flex items-center justify-center">
             {filteredModules.length > 0 && filteredModules.some(m => m.saldo > 0) ? (
@@ -368,7 +368,7 @@ export default function MemberPage() {
             <div className="select-wrapper">
               <i className="fa-solid fa-filter select-icon"></i>
               <select value={status} onChange={(e) => { setStatus(e.target.value); setCurrentPage(1); }}>
-                <option value="all">All Modules</option>
+                <option value="all">All Supplier</option>
                 <option value="active">Active Only</option>
                 <option value="inactive">Inactive Only</option>
               </select>
@@ -395,7 +395,7 @@ export default function MemberPage() {
           <table id="transactions-table">
             <thead>
               <tr>
-                <th>Module Label</th>
+                <th>Supplier Name</th>
                 <th>Target / Tujuan</th>
                 <th>Status</th>
                 <th className="text-right">Current Saldo</th>
@@ -418,7 +418,7 @@ export default function MemberPage() {
                   <td colSpan={6}>
                     <div className="empty-state">
                       <i className="fa-regular fa-folder-open empty-icon"></i>
-                      <p>No supplier modules found matching the criteria</p>
+                      <p>No suppliers found matching the criteria</p>
                     </div>
                   </td>
                 </tr>
@@ -450,7 +450,7 @@ export default function MemberPage() {
         {!loading && totalPages > 1 && (
           <footer className="table-footer" style={{ marginTop: '16px' }}>
             <div className="pagination-info">
-              Showing {startIdx + 1} to {Math.min(startIdx + limit, totalItems)} of {totalItems} modules
+              Showing {startIdx + 1} to {Math.min(startIdx + limit, totalItems)} of {totalItems} suppliers
             </div>
             <nav className="pagination-controls" aria-label="Pagination Navigation">
               <button

@@ -50,8 +50,8 @@ export async function GET(request) {
     }
 
     if (reseller) {
-      conditions.push("t.kode_reseller = @reseller");
-      dbRequest.input("reseller", sql.VarChar, reseller);
+      conditions.push("(t.kode_reseller = @reseller OR r.nama LIKE @reseller)");
+      dbRequest.input("reseller", sql.VarChar, `%${reseller}%`);
     }
 
     if (status) {
@@ -197,9 +197,12 @@ export async function GET(request) {
       { kode: 5, label: 'XL SUP' }
     ];
     const resellers = [
-      { kode: 'R001', nama: 'Indo Cell' },
-      { kode: 'R002', nama: 'Best Multipayment' },
-      { kode: 'R003', nama: 'Metro Pulsa' }
+      { kode: 'R001', nama: 'AMS PAY' },
+      { kode: 'R002', nama: 'ARRA UTAMA' },
+      { kode: 'R003', nama: 'ATT CELL' },
+      { kode: 'R004', nama: 'B-DIGITAL' },
+      { kode: 'R005', nama: 'Best Multipayment' },
+      { kode: 'R006', nama: 'BINTANG RELOAD' }
     ];
     const statuses = [20, 20, 20, 40, 50, 55, 20, 0, 2];
 
@@ -272,7 +275,10 @@ export async function GET(request) {
 
     // 4. Reseller filter
     if (reseller) {
-      filtered = filtered.filter(t => t.kode_reseller === reseller || t.nama_reseller === reseller);
+      filtered = filtered.filter(t => 
+        t.kode_reseller === reseller || 
+        (t.nama_reseller && t.nama_reseller.toLowerCase().includes(reseller.toLowerCase()))
+      );
     }
 
     // 5. Status filter

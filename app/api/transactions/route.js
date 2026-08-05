@@ -29,7 +29,7 @@ export async function GET(request) {
 
     if (status !== 'all') {
       if (status === 'suspect') {
-        conditions.push("status NOT IN (40, 50, 52, 54) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND')");
+        conditions.push("status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE'))");
       } else if (status === '40') {
         conditions.push("status IN (40, 52, 54)");
       } else if (status === '54') {
@@ -44,16 +44,16 @@ export async function GET(request) {
     }
 
     if (search) {
-      conditions.push("(tujuan LIKE @search OR kode LIKE @search OR kode_produk LIKE @search OR sn LIKE @search)");
+      conditions.push("(t.tujuan LIKE @search OR CAST(t.kode AS VARCHAR) LIKE @search OR t.kode_produk LIKE @search OR t.sn LIKE @search OR r.nama LIKE @search)");
       dbRequest.input("search", sql.VarChar, `%${search}%`);
     }
 
     if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-      conditions.push("CONVERT(date, tgl_entri) >= @startDate AND CONVERT(date, tgl_entri) <= @endDate");
+      conditions.push("CONVERT(date, t.tgl_entri) >= @startDate AND CONVERT(date, t.tgl_entri) <= @endDate");
       dbRequest.input("startDate", sql.VarChar, startDate);
       dbRequest.input("endDate", sql.VarChar, endDate);
     } else if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      conditions.push("CONVERT(date, tgl_entri) = @date");
+      conditions.push("CONVERT(date, t.tgl_entri) = @date");
       dbRequest.input("date", sql.VarChar, date);
     }
 
@@ -69,7 +69,12 @@ export async function GET(request) {
       `);
       total = countResult.recordset[0].total || 0;
     } else {
-      const countResult = await dbRequest.query(`SELECT COUNT(*) AS total FROM transaksi ${whereClause}`);
+      const countResult = await dbRequest.query(`
+        SELECT COUNT(*) AS total 
+        FROM transaksi t 
+        LEFT JOIN reseller r ON t.kode_reseller = r.kode 
+        ${whereClause}
+      `);
       total = countResult.recordset[0].total || 0;
     }
 
@@ -77,10 +82,11 @@ export async function GET(request) {
     dbRequest.input("limit", sql.Int, limit);
 
     const dataQuery = `
-      SELECT kode, tgl_entri, kode_produk, tujuan, harga, harga_beli, status, sn
-      FROM transaksi
+      SELECT t.kode, t.tgl_entri, t.kode_produk, t.tujuan, t.harga, t.harga_beli, t.status, t.sn, r.nama as nama_reseller
+      FROM transaksi t
+      LEFT JOIN reseller r ON t.kode_reseller = r.kode
       ${whereClause}
-      ORDER BY tgl_entri DESC
+      ORDER BY t.tgl_entri DESC
       OFFSET @offset ROWS
       FETCH NEXT @limit ROWS ONLY
     `;
@@ -102,6 +108,7 @@ export async function GET(request) {
     // High-fidelity fallback with dynamic in-memory filtering and search
     const mockList = [];
     const products = ['XLDP2', 'TSEL5', 'ML10', 'AXIS5', 'TRI10', 'PLN20', 'PLN50'];
+    const resellers = ['AMS PAY', 'ARRA UTAMA', 'ATT CELL', 'B-DIGITAL', 'Best Multipayment', 'BINTANG RELOAD'];
     const statuses = [20, 20, 20, 20, 40, 50, 55, 54, 20];
     const sns = ['TXSN1128', 'TXSN4482', 'N/A', 'TXSN9824', '0000', 'PEND', 'TXSN0391'];
     
@@ -122,9 +129,16 @@ export async function GET(request) {
         harga: price,
         harga_beli: cost,
         status: statusVal,
-        sn: snVal
+        sn: snVal,
+        nama_reseller: resellers[i % resellers.length]
       });
     }
+
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const isSuspectTx = (t) => {
+      const cleanSn = t.sn ? String(t.sn).trim().toUpperCase() : '';
+      return ![40, 50, 52, 54].includes(t.status) && (!cleanSn || suspectSns.includes(cleanSn));
+    };
 
     // Apply filtering
     let filtered = [...mockList];
@@ -132,7 +146,7 @@ export async function GET(request) {
     // Status filter
     if (status !== 'all') {
       if (status === 'suspect') {
-        filtered = filtered.filter(t => ![40, 50, 52, 54].includes(t.status) && ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn));
+        filtered = filtered.filter(t => isSuspectTx(t));
       } else if (status === '40') {
         filtered = filtered.filter(t => [40, 52, 54].includes(t.status));
       } else if (status === '54') {
@@ -165,7 +179,8 @@ export async function GET(request) {
         String(t.kode).includes(q) ||
         (t.kode_produk && t.kode_produk.toLowerCase().includes(q)) ||
         (t.tujuan && t.tujuan.includes(q)) ||
-        (t.sn && t.sn.toLowerCase().includes(q))
+        (t.sn && t.sn.toLowerCase().includes(q)) ||
+        (t.nama_reseller && t.nama_reseller.toLowerCase().includes(q))
       );
     }
 

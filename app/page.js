@@ -233,8 +233,9 @@ export default function Dashboard() {
   };
 
   const getStatusBadge = (txStatus, sn) => {
-    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'];
-    const isSuspectSn = sn && suspectSns.includes(sn.toUpperCase().trim());
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const cleanSn = sn ? String(sn).trim().toUpperCase() : '';
+    const isSuspectSn = !cleanSn || suspectSns.includes(cleanSn);
 
     if (txStatus === 52 || txStatus === 54) {
       return <span className="badge status-failed"><i className="fa-solid fa-circle-xmark"></i> Tujuan Salah</span>;
@@ -705,12 +706,13 @@ export default function Dashboard() {
                 <th scope="col" className="text-right">Profit</th>
                 <th scope="col">SN / Reference</th>
                 <th scope="col">Status</th>
+                <th scope="col">Member</th>
               </tr>
             </thead>
             <tbody>
               {tableLoading ? (
                 <tr className="placeholder-row">
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <div className="table-loader-wrapper">
                       <div className="spinner"></div>
                       <span>Fetching database records...</span>
@@ -719,7 +721,7 @@ export default function Dashboard() {
                 </tr>
               ) : tableError ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <div className="empty-state" style={{ color: 'var(--failed)' }}>
                       <i className="fa-solid fa-circle-exclamation empty-icon" style={{ color: 'var(--failed)' }}></i>
                       <p style={{ fontWeight: 600 }}>Failed to Load Transactions</p>
@@ -732,7 +734,7 @@ export default function Dashboard() {
                 </tr>
               ) : transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <div className="empty-state">
                       <i className="fa-regular fa-folder-open empty-icon"></i>
                       <p>No transactions found matching the criteria</p>
@@ -761,6 +763,7 @@ export default function Dashboard() {
                         {item.sn || <span className="text-muted">-</span>}
                       </td>
                       <td>{getStatusBadge(item.status, item.sn)}</td>
+                      <td className="font-semibold">{item.nama_reseller || '-'}</td>
                     </tr>
                   );
                 })

@@ -26,7 +26,7 @@ export async function GET(request) {
 
     if (status !== 'all') {
       if (status === 'suspect') {
-        conditions.push("status NOT IN (40, 50, 52, 54) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND')");
+        conditions.push("status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE'))");
       } else if (status === '40') {
         conditions.push("status IN (40, 52, 54)");
       } else if (status === '54') {
@@ -59,12 +59,12 @@ export async function GET(request) {
     const query = `
       SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN status = 20 AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as successCount,
+        SUM(CASE WHEN status = 20 AND (sn IS NOT NULL AND LTRIM(RTRIM(sn)) <> '' AND LTRIM(RTRIM(sn)) <> '-' AND UPPER(LTRIM(RTRIM(sn))) NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as successCount,
         SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END) as failedCount,
         SUM(CASE WHEN status = 50 THEN 1 ELSE 0 END) as canceledCount,
-        SUM(CASE WHEN status NOT IN (40, 50, 52, 54) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') THEN 1 ELSE 0 END) as suspectCount,
+        SUM(CASE WHEN status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as suspectCount,
         SUM(CASE WHEN status IN (52, 54) THEN 1 ELSE 0 END) as wrongNumberCount,
-        SUM(CASE WHEN status NOT IN (20, 40, 50, 52, 54) AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as pendingCount,
+        SUM(CASE WHEN status NOT IN (20, 40, 50, 52, 54) AND (sn IS NOT NULL AND LTRIM(RTRIM(sn)) <> '' AND LTRIM(RTRIM(sn)) <> '-' AND UPPER(LTRIM(RTRIM(sn))) NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as pendingCount,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga, 0) AS BIGINT) ELSE 0 END) as totalRetail,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga_beli, 0) AS BIGINT) ELSE 0 END) as totalCost,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as totalProfit
@@ -117,13 +117,19 @@ export async function GET(request) {
       });
     }
 
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const isSuspectTx = (t) => {
+      const cleanSn = t.sn ? String(t.sn).trim().toUpperCase() : '';
+      return ![40, 50, 52, 54].includes(t.status) && (!cleanSn || suspectSns.includes(cleanSn));
+    };
+
     // Apply filtering
     let filtered = [...mockList];
 
     // Status filter
     if (status !== 'all') {
       if (status === 'suspect') {
-        filtered = filtered.filter(t => ![40, 50, 52, 54].includes(t.status) && ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn));
+        filtered = filtered.filter(t => isSuspectTx(t));
       } else if (status === '40') {
         filtered = filtered.filter(t => [40, 52, 54].includes(t.status));
       } else if (status === '54') {
@@ -162,12 +168,12 @@ export async function GET(request) {
 
     // Compute dynamic stats
     const total = filtered.length;
-    const successCount = filtered.filter(t => t.status === 20 && !['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn)).length;
+    const suspectCount = filtered.filter(t => isSuspectTx(t)).length;
+    const successCount = filtered.filter(t => t.status === 20 && !isSuspectTx(t)).length;
     const failedCount = filtered.filter(t => t.status === 40).length;
     const canceledCount = filtered.filter(t => t.status === 50).length;
-    const suspectCount = filtered.filter(t => ![40, 50, 52, 54].includes(t.status) && ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn)).length;
     const wrongNumberCount = filtered.filter(t => [52, 54].includes(t.status)).length;
-    const pendingCount = filtered.filter(t => ![20, 40, 50, 52, 54].includes(t.status) && !['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn)).length;
+    const pendingCount = filtered.filter(t => ![20, 40, 50, 52, 54].includes(t.status) && !isSuspectTx(t)).length;
 
     const totalRetail = filtered.filter(t => t.status === 20).reduce((sum, t) => sum + (t.harga || 0), 0);
     const totalCost = filtered.filter(t => t.status === 20).reduce((sum, t) => sum + (t.harga_beli || 0), 0);

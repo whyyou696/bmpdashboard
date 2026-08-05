@@ -20,9 +20,12 @@ export async function GET() {
         { kode: 5, label: 'XL SUP' }
       ],
       resellers: [
-        { kode: 'R001', nama: 'Indo Cell' },
-        { kode: 'R002', nama: 'Best Multipayment' },
-        { kode: 'R003', nama: 'Metro Pulsa' }
+        { kode: 'R001', nama: 'AMS PAY' },
+        { kode: 'R002', nama: 'ARRA UTAMA' },
+        { kode: 'R003', nama: 'ATT CELL' },
+        { kode: 'R004', nama: 'B-DIGITAL' },
+        { kode: 'R005', nama: 'Best Multipayment' },
+        { kode: 'R006', nama: 'BINTANG RELOAD' }
       ]
     });
   }

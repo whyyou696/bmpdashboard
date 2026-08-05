@@ -27,7 +27,7 @@ export async function GET(request) {
 
     if (status !== 'all') {
       if (status === 'suspect') {
-        conditions.push("status NOT IN (40, 50, 52, 54) AND sn IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND')");
+        conditions.push("status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE'))");
       } else if (status === '40') {
         conditions.push("status IN (40, 52, 54)");
       } else if (status === '54') {
@@ -81,7 +81,7 @@ export async function GET(request) {
       SELECT 
         ${labelSelect} as label,
         COUNT(*) as total,
-        SUM(CASE WHEN status = 20 AND (sn NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND') OR sn IS NULL) THEN 1 ELSE 0 END) as success,
+        SUM(CASE WHEN status = 20 AND (sn IS NOT NULL AND LTRIM(RTRIM(sn)) <> '' AND LTRIM(RTRIM(sn)) <> '-' AND UPPER(LTRIM(RTRIM(sn))) NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as success,
         SUM(CASE WHEN status IN (40, 50) THEN 1 ELSE 0 END) as failed,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as profit
       FROM transaksi
@@ -121,13 +121,19 @@ export async function GET(request) {
       });
     }
 
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const isValidSn = (sn) => {
+      const cleanSn = sn ? String(sn).trim().toUpperCase() : '';
+      return cleanSn !== '' && !suspectSns.includes(cleanSn);
+    };
+
     // Apply filtering
     let filtered = [...mockList];
 
     // Status filter
     if (status !== 'all') {
       if (status === 'suspect') {
-        filtered = filtered.filter(t => ![40, 50, 52, 54].includes(t.status) && ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn));
+        filtered = filtered.filter(t => ![40, 50, 52, 54].includes(t.status) && !isValidSn(t.sn));
       } else if (status === '40') {
         filtered = filtered.filter(t => [40, 52, 54].includes(t.status));
       } else if (status === '54') {
@@ -186,7 +192,7 @@ export async function GET(request) {
       filtered.forEach(t => {
         const hr = new Date(t.tgl_entri).getHours();
         grouped[hr].total += 1;
-        if (t.status === 20 && !['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn)) {
+        if (t.status === 20 && isValidSn(t.sn)) {
           grouped[hr].success += 1;
           grouped[hr].profit += (t.harga - t.harga_beli);
         } else if ([40, 50].includes(t.status)) {
@@ -202,7 +208,7 @@ export async function GET(request) {
           grouped[key] = { label: key, total: 0, success: 0, failed: 0, profit: 0 };
         }
         grouped[key].total += 1;
-        if (t.status === 20 && !['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND'].includes(t.sn)) {
+        if (t.status === 20 && isValidSn(t.sn)) {
           grouped[key].success += 1;
           grouped[key].profit += (t.harga - t.harga_beli);
         } else if ([40, 50].includes(t.status)) {
