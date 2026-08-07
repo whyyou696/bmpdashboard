@@ -10,152 +10,120 @@ export async function GET(request) {
   const reseller = searchParams.get('reseller') || '';
   const product = searchParams.get('product') || '';
   const status = searchParams.get('status') || '';
-  const terminal = searchParams.get('terminal') || '';
-  const serviceCenter = searchParams.get('serviceCenter') || '';
   const startDate = searchParams.get('startDate') || '';
   const endDate = searchParams.get('endDate') || '';
-  const msgType = searchParams.get('msgType') || '';
   const sortCol = searchParams.get('sortCol') || 'created_at';
   const sortDir = searchParams.get('sortDir') || 'desc';
 
-  const getInboxStatusLabel = (statusTrx, statusInbox) => {
-    if (statusTrx !== null && statusTrx !== undefined) {
-      if (statusTrx === 20) return 'Success';
-      if (statusTrx === 52) return 'Duplicate Transaction';
-      if (statusTrx === 40 || statusTrx === 50 || statusTrx === 55) return 'Failed';
-      if (statusTrx === 0 || statusTrx === 2) return 'Processing';
-      return 'Pending';
-    }
-    if (statusInbox === 20) return 'Success';
-    if (statusInbox === 46) return 'Duplicate Transaction';
-    if (statusInbox === 40) return 'Failed';
+  const getInboxStatusLabel = (txStatus) => {
+    if (txStatus === 20) return 'Success';
+    if (txStatus === 52) return 'Duplicate Transaction';
+    if (txStatus === 40 || txStatus === 50 || txStatus === 55 || txStatus === 54) return 'Failed';
+    if (txStatus === 0 || txStatus === 1 || txStatus === 2) return 'Processing';
     return 'Pending';
   };
 
   try {
     const pool = await getDbConnection();
-    const dbRequest = pool.request();
-    let conditions = [];
 
-    if (search) {
-      conditions.push("(i.pengirim LIKE @search OR i.pesan LIKE @search OR i.kode_reseller LIKE @search OR r.nama LIKE @search OR t.kode_produk LIKE @search OR t.tujuan LIKE @search OR t.ref_id LIKE @search OR CAST(i.kode_transaksi AS VARCHAR) LIKE @search)");
-      dbRequest.input("search", sql.VarChar, `%${search}%`);
-    }
+    // Helper to create a fresh DB request with inputs
+    const createReq = () => {
+      const dbRequest = pool.request();
+      const conditions = ["t.kode_reseller LIKE 'BEST%'"]; // Enforce Best Multipayment dataset only
 
-    if (reseller) {
-      conditions.push("i.kode_reseller = @reseller");
-      dbRequest.input("reseller", sql.VarChar, reseller);
-    }
+      if (search) {
+        conditions.push("(t.tujuan LIKE @search OR CAST(t.kode AS VARCHAR) LIKE @search OR t.kode_produk LIKE @search OR t.sn LIKE @search OR r.nama LIKE @search OR t.kode_reseller LIKE @search OR t.pengirim LIKE @search)");
+        dbRequest.input("search", sql.VarChar, `%${search}%`);
+      }
 
-    if (product) {
-      conditions.push("t.kode_produk = @product");
-      dbRequest.input("product", sql.VarChar, product);
-    }
+      if (reseller) {
+        conditions.push("(t.kode_reseller = @reseller OR r.nama LIKE @reseller)");
+        dbRequest.input("reseller", sql.VarChar, reseller.includes('%') ? reseller : `%${reseller}%`);
+      }
 
-    if (terminal) {
-      conditions.push("i.kode_terminal = @terminal");
-      dbRequest.input("terminal", sql.Int, parseInt(terminal));
-    }
+      if (product) {
+        conditions.push("t.kode_produk = @product");
+        dbRequest.input("product", sql.VarChar, product);
+      }
 
-    if (serviceCenter) {
-      conditions.push("i.service_center = @serviceCenter");
-      dbRequest.input("serviceCenter", sql.VarChar, serviceCenter);
-    }
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        conditions.push("CONVERT(date, t.tgl_entri) >= @startDate AND CONVERT(date, t.tgl_entri) <= @endDate");
+        dbRequest.input("startDate", sql.VarChar, startDate);
+        dbRequest.input("endDate", sql.VarChar, endDate);
+      }
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate + 'T23:59:59.999');
-      conditions.push("i.tgl_entri >= @startDate AND i.tgl_entri <= @endDate");
-      dbRequest.input("startDate", sql.DateTime2, start);
-      dbRequest.input("endDate", sql.DateTime2, end);
-    }
+      if (status) {
+        if (status === 'Success') conditions.push("t.status = 20");
+        else if (status === 'Duplicate Transaction') conditions.push("t.status = 52");
+        else if (status === 'Failed') conditions.push("t.status IN (40, 50, 55, 54)");
+        else if (status === 'Processing') conditions.push("t.status IN (0, 1, 2)");
+        else if (status === 'Pending') conditions.push("t.status NOT IN (20, 40, 50, 52, 54, 55, 0, 1, 2)");
+      }
 
-    if (status) {
-      if (status === 'Success') conditions.push("(t.status = 20 OR (t.status IS NULL AND i.status = 20))");
-      else if (status === 'Duplicate Transaction') conditions.push("(t.status = 52 OR (t.status IS NULL AND i.status = 46))");
-      else if (status === 'Failed') conditions.push("(t.status IN (40, 50, 55) OR (t.status IS NULL AND i.status = 40))");
-      else if (status === 'Processing') conditions.push("(t.status IN (0, 2))");
-      else if (status === 'Pending') conditions.push("((t.status NOT IN (20, 40, 50, 52, 55, 0, 2) OR t.status IS NULL) AND i.status NOT IN (20, 40, 46))");
-    }
+      return { dbRequest, conditions };
+    };
 
-    if (msgType) {
-      if (msgType === "reseller") conditions.push("i.is_jawaban = 0");
-      else if (msgType === "provider") conditions.push("i.is_jawaban = 1");
-    }
+    const { dbRequest: countReq, conditions: countConditions } = createReq();
+    const whereClause = "WHERE " + countConditions.join(" AND ");
 
-    const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+    const countResult = await countReq.query(`
+      SELECT COUNT(1) AS total 
+      FROM transaksi t WITH (NOLOCK)
+      LEFT JOIN reseller r WITH (NOLOCK) ON t.kode_reseller = r.kode
+      ${whereClause}
+    `);
+    const total = countResult.recordset[0]?.total || 0;
 
-    let total = 0;
-    if (whereClause === "") {
-      const countResult = await dbRequest.query(`
-        SELECT CAST(SUM(p.rows) AS INT) AS total 
-        FROM sys.partitions p
-        INNER JOIN sys.tables t ON p.object_id = t.object_id
-        WHERE t.name = 'inbox' AND p.index_id IN (0, 1)
-      `);
-      total = countResult.recordset[0].total || 0;
-    } else {
-      const countResult = await dbRequest.query(`
-        SELECT COUNT(*) AS total 
-        FROM inbox i
-        LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
-        LEFT JOIN reseller r ON i.kode_reseller = r.kode
-        ${whereClause}
-      `);
-      total = countResult.recordset[0].total || 0;
-    }
+    // Fresh request for data query
+    const { dbRequest: dataReq, conditions: dataConditions } = createReq();
+    const dataWhereClause = "WHERE " + dataConditions.join(" AND ");
 
-    dbRequest.input("offset", sql.Int, offset);
-    dbRequest.input("limit", sql.Int, limit);
+    dataReq.input("offset", sql.Int, offset);
+    dataReq.input("limit", sql.Int, limit);
 
-    let sqlSort = "i.kode DESC";
-    if (sortCol === "inbox_id") sqlSort = `i.kode ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
-    else if (sortCol === "created_at") sqlSort = `i.tgl_entri ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
+    let sqlSort = "t.kode DESC";
+    if (sortCol === "inbox_id") sqlSort = `t.kode ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
+    else if (sortCol === "created_at") sqlSort = `t.kode ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
     else if (sortCol === "reseller_name") sqlSort = `r.nama ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
     else if (sortCol === "product_code") sqlSort = `t.kode_produk ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
     else if (sortCol === "destination") sqlSort = `t.tujuan ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
-    else if (sortCol === "status") sqlSort = `t.status ${sortDir === 'asc' ? 'ASC' : 'DESC'}, i.status ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
+    else if (sortCol === "status") sqlSort = `t.status ${sortDir === 'asc' ? 'ASC' : 'DESC'}`;
 
     const dataQuery = `
       SELECT 
-        i.kode as inbox_id,
-        i.kode_transaksi as transaction_id,
-        i.tgl_entri as created_at,
-        i.pengirim as sender_ip,
-        i.kode_reseller as reseller_code,
+        t.kode as inbox_id,
+        t.kode as transaction_id,
+        t.tgl_entri as created_at,
+        t.pengirim as sender_ip,
+        t.kode_reseller as reseller_code,
         r.nama as reseller_name,
         t.kode_produk as product_code,
         t.tujuan as destination,
-        i.pesan as message,
-        i.status as status_inbox,
-        t.status as status_trx,
-        i.kode_terminal as terminal,
-        i.service_center as service_center,
-        t.ref_id as reference_id
-      FROM inbox i
-      LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
-      LEFT JOIN reseller r ON i.kode_reseller = r.kode
-      ${whereClause}
+        t.sn as message,
+        t.status as status_trx
+      FROM transaksi t WITH (NOLOCK)
+      LEFT JOIN reseller r WITH (NOLOCK) ON t.kode_reseller = r.kode
+      ${dataWhereClause}
       ORDER BY ${sqlSort}
       OFFSET @offset ROWS
       FETCH NEXT @limit ROWS ONLY
     `;
 
-    const dataResult = await dbRequest.query(dataQuery);
+    const dataResult = await dataReq.query(dataQuery);
     const formattedData = dataResult.recordset.map(row => ({
       inbox_id: row.inbox_id,
-      transaction_id: row.transaction_id || row.inbox_id,
+      transaction_id: row.transaction_id,
       created_at: row.created_at,
-      sender_ip: row.sender_ip,
-      reseller_code: row.reseller_code,
+      sender_ip: row.sender_ip || "-",
+      reseller_code: row.reseller_code || "-",
       reseller_name: row.reseller_name || "-",
       product_code: row.product_code || "-",
       destination: row.destination || "-",
-      message: row.message,
-      status: getInboxStatusLabel(row.status_trx, row.status_inbox),
-      terminal: row.terminal || "-",
-      service_center: row.service_center || "-",
-      reference_id: row.reference_id || "-"
+      message: row.message ? row.message : `Trx ${row.product_code || ''} ke ${row.destination || ''}`,
+      status: getInboxStatusLabel(row.status_trx),
+      terminal: "-",
+      service_center: "-",
+      reference_id: row.message || "-"
     }));
 
     return NextResponse.json({
@@ -164,17 +132,18 @@ export async function GET(request) {
     });
 
   } catch (err) {
-    console.warn("SQL Query failed, falling back to mock inbox logs.");
-    
+    console.warn("SQL Query failed, returning fallback inbox data based on transactions:", err.message);
+
     const mockList = [];
     const products = ['XLDP2', 'TSEL5', 'ML10', 'AXIS5', 'TRI10', 'PLN20', 'PLN50'];
     const resellers = [
-      { kode: 'R001', nama: 'Indo Cell' },
-      { kode: 'R002', nama: 'Best Multipayment' },
-      { kode: 'R003', nama: 'Metro Pulsa' }
+      { kode: 'BEST0819', nama: 'CHIKA MP RELOAD' },
+      { kode: 'BEST001', nama: 'DIGIFLAZZ BEST' },
+      { kode: 'BEST1305', nama: 'PIXEL TELEMEDIA' },
+      { kode: 'BEST055', nama: 'AMS PAY' }
     ];
-    const statuses = ['Success', 'Failed', 'Duplicate Transaction', 'Pending', 'Processing'];
-    const scs = ['SMS CENTER 1', 'TELEGRAM CENTER', 'WA CENTER'];
+    const statuses = [20, 20, 20, 40, 52, 55, 20];
+    const ips = ['103.166.91.114', '52.74.250.133', '118.99.85.170', '188.166.178.169'];
 
     const todayMs = Date.now();
     for (let i = 0; i < 500; i++) {
@@ -182,50 +151,31 @@ export async function GET(request) {
       const prod = products[i % products.length];
       const res = resellers[i % resellers.length];
       const statusVal = statuses[i % statuses.length];
-      const terminalVal = (i % 3) + 1;
-      const isJawaban = i % 2; // 0 or 1
-      const dateVal = new Date(todayMs - (i * 60000)); // every 1 min
+      const dateVal = new Date(todayMs - (i * 60000));
 
       mockList.push({
-        inbox_id: 1828625 - idx,
-        transaction_id: 1828625 - idx,
+        inbox_id: 2411460 - idx,
+        transaction_id: 2411460 - idx,
         created_at: dateVal.toISOString(),
-        sender_ip: '127.0.0.1',
+        sender_ip: ips[i % ips.length],
         reseller_code: res.kode,
         reseller_name: res.nama,
         product_code: prod,
         destination: '0812' + String(10000000 + (i * 17) % 89999999),
-        message: isJawaban === 1 
-          ? `SUKSES. Trx ${prod} to 0812${String(10000000 + (i * 17) % 89999999)} Success. SN: TXSN${100000 + i}`
-          : `Beli ${prod} ke 0812${String(10000000 + (i * 17) % 89999999)}. PIN 1234`,
-        status: statusVal,
-        terminal: terminalVal,
-        service_center: scs[i % scs.length],
-        reference_id: 'REF' + String(100000 + (i * 13) % 899999),
-        is_jawaban: isJawaban
+        message: `trx?product=${prod}&qty=1&dest=0812${String(10000000 + (i * 17) % 89999999)}&memberID=${res.kode}`,
+        status: getInboxStatusLabel(statusVal),
+        terminal: "-",
+        service_center: "-",
+        reference_id: 'REF' + String(100000 + (i * 13) % 899999)
       });
     }
 
     let filtered = [...mockList];
 
-    // 1. Date filter
-    if (startDate && endDate) {
-      filtered = filtered.filter(t => {
-        const d = new Date(t.created_at);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const localDateStr = `${yyyy}-${mm}-${dd}`;
-        return localDateStr >= startDate && localDateStr <= endDate;
-      });
-    }
-
-    // 2. Search filter
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(t => 
         String(t.inbox_id).includes(q) ||
-        String(t.transaction_id).includes(q) ||
         (t.message && t.message.toLowerCase().includes(q)) ||
         (t.sender_ip && t.sender_ip.includes(q)) ||
         (t.reseller_code && t.reseller_code.toLowerCase().includes(q)) ||
@@ -235,70 +185,17 @@ export async function GET(request) {
       );
     }
 
-    // 3. Reseller filter
     if (reseller) {
       filtered = filtered.filter(t => t.reseller_code === reseller || t.reseller_name === reseller);
     }
 
-    // 4. Product filter
     if (product) {
       filtered = filtered.filter(t => t.product_code === product);
     }
 
-    // 5. Terminal filter
-    if (terminal) {
-      filtered = filtered.filter(t => String(t.terminal) === String(terminal));
-    }
-
-    // 6. Service Center filter
-    if (serviceCenter) {
-      filtered = filtered.filter(t => t.service_center === serviceCenter);
-    }
-
-    // 7. Status filter
     if (status) {
       filtered = filtered.filter(t => t.status === status);
     }
-
-    // 8. msgType filter
-    if (msgType) {
-      if (msgType === 'reseller') {
-        filtered = filtered.filter(t => t.is_jawaban === 0);
-      } else if (msgType === 'provider') {
-        filtered = filtered.filter(t => t.is_jawaban === 1);
-      }
-    }
-
-    // 9. Sorting
-    filtered.sort((a, b) => {
-      let valA, valB;
-      if (sortCol === 'inbox_id') {
-        valA = a.inbox_id;
-        valB = b.inbox_id;
-      } else if (sortCol === 'created_at') {
-        valA = new Date(a.created_at).getTime();
-        valB = new Date(b.created_at).getTime();
-      } else if (sortCol === 'reseller_name') {
-        valA = a.reseller_name;
-        valB = b.reseller_name;
-      } else if (sortCol === 'product_code') {
-        valA = a.product_code;
-        valB = b.product_code;
-      } else if (sortCol === 'destination') {
-        valA = a.destination;
-        valB = b.destination;
-      } else if (sortCol === 'status') {
-        valA = a.status;
-        valB = b.status;
-      } else {
-        valA = new Date(a.created_at).getTime();
-        valB = new Date(b.created_at).getTime();
-      }
-      if (typeof valA === 'string') {
-        return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      }
-      return sortDir === 'asc' ? valA - valB : valB - valA;
-    });
 
     const total = filtered.length;
     const paginated = filtered.slice(offset, offset + limit);

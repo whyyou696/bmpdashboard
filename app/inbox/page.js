@@ -505,7 +505,7 @@ export default function InboxPage() {
             <div className="select-wrapper">
               <i className="fa-solid fa-user select-icon"></i>
               <select value={reseller} onChange={(e) => setReseller(e.target.value)}>
-                <option value="">All Resellers</option>
+                <option value="">Semua Reseller</option>
                 {resellersList.map(r => (
                   <option key={r.kode} value={r.kode}>{r.nama} ({r.kode})</option>
                 ))}
@@ -516,31 +516,9 @@ export default function InboxPage() {
             <div className="select-wrapper">
               <i className="fa-solid fa-box select-icon"></i>
               <select value={product} onChange={(e) => setProduct(e.target.value)}>
-                <option value="">All Products</option>
+                <option value="">Semua Produk</option>
                 {productsList.map(p => (
                   <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Terminal select */}
-            <div className="select-wrapper">
-              <i className="fa-solid fa-cubes select-icon"></i>
-              <select value={terminal} onChange={(e) => setTerminal(e.target.value)}>
-                <option value="">All Terminals</option>
-                {terminalsList.map(t => (
-                  <option key={t} value={t}>Terminal {t}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* SC select */}
-            <div className="select-wrapper">
-              <i className="fa-solid fa-rss select-icon"></i>
-              <select value={serviceCenter} onChange={(e) => setServiceCenter(e.target.value)}>
-                <option value="">All Service Centers</option>
-                {serviceCentersList.map(sc => (
-                  <option key={sc} value={sc}>{sc}</option>
                 ))}
               </select>
             </div>
@@ -549,22 +527,12 @@ export default function InboxPage() {
             <div className="select-wrapper">
               <i className="fa-solid fa-filter select-icon"></i>
               <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="">All Statuses</option>
+                <option value="">Semua Status</option>
                 <option value="Success">Success</option>
                 <option value="Duplicate Transaction">Duplicate Transaction</option>
                 <option value="Failed">Failed</option>
                 <option value="Processing">Processing</option>
                 <option value="Pending">Pending</option>
-              </select>
-            </div>
-
-            {/* MsgType select */}
-            <div className="select-wrapper">
-              <i className="fa-solid fa-envelope select-icon"></i>
-              <select value={msgType} onChange={(e) => setMsgType(e.target.value)}>
-                <option value="">All Message Types</option>
-                <option value="reseller">Reseller Requests</option>
-                <option value="provider">Provider Replies</option>
               </select>
             </div>
 
@@ -585,9 +553,9 @@ export default function InboxPage() {
             <div className="select-wrapper">
               <i className="fa-solid fa-list select-icon"></i>
               <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
-                <option value={20}>20 Rows</option>
-                <option value={50}>50 Rows</option>
-                <option value={100}>100 Rows</option>
+                <option value={20}>20 Baris</option>
+                <option value={50}>50 Baris</option>
+                <option value={100}>100 Baris</option>
               </select>
             </div>
 
@@ -603,22 +571,23 @@ export default function InboxPage() {
             <thead>
               <tr className="cursor-pointer">
                 <th onClick={() => { setSortCol('inbox_id'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
-                  ID <i className={`fa-solid ${sortCol === 'inbox_id' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
+                  Kode <i className={`fa-solid ${sortCol === 'inbox_id' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
                 <th onClick={() => { setSortCol('created_at'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
-                  Created At <i className={`fa-solid ${sortCol === 'created_at' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
+                  Tgl. Entri <i className={`fa-solid ${sortCol === 'created_at' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
-                <th>Sender / Port</th>
+                <th>Pengirim</th>
+                <th>Kode Reseller</th>
                 <th onClick={() => { setSortCol('reseller_name'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
-                  Reseller <i className={`fa-solid ${sortCol === 'reseller_name' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
+                  Nama Reseller <i className={`fa-solid ${sortCol === 'reseller_name' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
                 <th onClick={() => { setSortCol('product_code'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
-                  Product <i className={`fa-solid ${sortCol === 'product_code' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
+                  Produk <i className={`fa-solid ${sortCol === 'product_code' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
                 <th onClick={() => { setSortCol('destination'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
-                  Destination <i className={`fa-solid ${sortCol === 'destination' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
+                  Tujuan <i className={`fa-solid ${sortCol === 'destination' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
-                <th>Message Content</th>
+                <th>Pesan / Isi Inbox</th>
                 <th onClick={() => { setSortCol('status'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
                   Status <i className={`fa-solid ${sortCol === 'status' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
@@ -627,23 +596,23 @@ export default function InboxPage() {
             <tbody>
               {loadingTable ? (
                 <tr className="placeholder-row">
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="table-loader-wrapper">
                       <div className="spinner"></div>
-                      <span>Fetching message records...</span>
+                      <span>Mengambil data inbox OtomaX...</span>
                     </div>
                   </td>
                 </tr>
               ) : inboxLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="empty-state">
                       <i className="fa-regular fa-folder-open empty-icon"></i>
-                      <p>No inbox messages found matching the filters</p>
+                      <p>Tidak ada data inbox yang ditemukan</p>
                     </div>
                   </td>
                 </tr>
-               ) : (
+              ) : (
                 inboxLogs.map((log) => {
                   let statusStyle = {};
                   if (log.status === 'Success') {
@@ -659,18 +628,19 @@ export default function InboxPage() {
                   }
                   
                   return (
-                    <tr key={log.inbox_id} onClick={() => openRowDetails(log.inbox_id)} className="inbox-row-clickable">
-                      <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{log.inbox_id}</td>
-                      <td>{formatDateTime(log.created_at)}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{log.sender_ip} (T{log.terminal})</td>
-                      <td className="font-semibold">{log.reseller_name} ({log.reseller_code})</td>
+                    <tr key={log.inbox_id} onClick={() => openRowDetails(log.inbox_id)} className="inbox-row-clickable hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
+                      <td style={{ fontWeight: 600, fontFamily: 'monospace' }} className="text-blue-500 font-semibold">{log.inbox_id}</td>
+                      <td className="text-slate-300 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
+                      <td style={{ color: 'var(--text-secondary)' }} className="font-mono">{log.sender_ip}</td>
+                      <td className="font-mono text-blue-400 font-semibold">{log.reseller_code}</td>
+                      <td className="font-semibold text-slate-700 dark:text-slate-200">{log.reseller_name}</td>
                       <td>
                         <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontWeight: 500 }}>
                           {log.product_code}
                         </span>
                       </td>
-                      <td>{log.destination}</td>
-                      <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.message}>
+                      <td className="font-mono">{log.destination}</td>
+                      <td style={{ maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.message}>
                         {log.message}
                       </td>
                       <td>

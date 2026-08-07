@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -21,20 +21,21 @@ export default function ModulPage() {
   // Filter Dropdown Lists
   const [modulesList, setModulesList] = useState([]);
   const [resellersList, setResellersList] = useState([]);
+  const [productsList, setProductsList] = useState([]);
 
-  // Active Filters state
-  const [search, setSearch] = useState('');
-  const [dateMode, setDateMode] = useState('today');
+  // Active Filters state (1. Tanggal, 2. Product, 3. Reseller, 4. Modul, 5. Search, 6. Auto Refresh)
+  const [dateMode, setDateMode] = useState('today'); // Default: 'today' (Hari ini)
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [modulFilter, setModulFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [resellerFilter, setResellerFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [snEmpty, setSnEmpty] = useState(true);
+  const [modulFilter, setModulFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  // Pagination & Data States
   const [limit, setLimit] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Data States
   const [transactions, setTransactions] = useState([]);
   const [productivity, setProductivity] = useState({
     totalTrx: 0,
@@ -74,13 +75,14 @@ export default function ModulPage() {
         const json = await res.json();
         setModulesList(json.modules || []);
         setResellersList(json.resellers || []);
+        setProductsList(json.products || []);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Fetch metrics & logs
+  // Fetch metrics & logs with filters
   const fetchModulData = async (noLoading = false) => {
     if (!noLoading) setLoading(true);
 
@@ -103,23 +105,62 @@ export default function ModulPage() {
         page: currentPage.toString(),
         limit: limit.toString(),
         search: search.trim(),
-        modul: modulFilter,
-        reseller: resellerFilter,
-        status: statusFilter,
+        dateMode,
         startDate: startVal,
         endDate: endVal,
-        dateMode,
-        sn_empty: snEmpty ? 'true' : 'false'
+        product: productFilter,
+        reseller: resellerFilter,
+        modul: modulFilter
       });
 
       const res = await fetch(`/api/modul/transactions?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        setTransactions(json.data || []);
+        const dataList = json.data || [];
+        setTransactions(dataList);
         setProductivity(json.productivity || {});
         setTopLists(json.topLists || { modules: [], products: [], resellers: [] });
         setTotalItems(json.pagination?.total || 0);
         setTotalPages(json.pagination?.totalPages || 0);
+
+        // Dynamically merge unique filter options from active dataset
+        if (dataList.length > 0) {
+          setModulesList(prev => {
+            const set = new Set(prev.map(m => m.label || m.nama || m));
+            const arr = [...prev];
+            dataList.forEach(t => {
+              if (t.nama_modul && !set.has(t.nama_modul)) {
+                set.add(t.nama_modul);
+                arr.push({ kode: t.kode_modul || t.nama_modul, label: t.nama_modul });
+              }
+            });
+            return arr;
+          });
+
+          setResellersList(prev => {
+            const set = new Set(prev.map(r => r.nama || r.label || r));
+            const arr = [...prev];
+            dataList.forEach(t => {
+              if (t.nama_reseller && !set.has(t.nama_reseller)) {
+                set.add(t.nama_reseller);
+                arr.push({ kode: t.kode_reseller || t.nama_reseller, nama: t.nama_reseller });
+              }
+            });
+            return arr;
+          });
+
+          setProductsList(prev => {
+            const set = new Set(prev.map(p => p.nama || p.kode || p));
+            const arr = [...prev];
+            dataList.forEach(t => {
+              if (t.kode_produk && !set.has(t.kode_produk)) {
+                set.add(t.kode_produk);
+                arr.push({ kode: t.kode_produk, nama: t.kode_produk });
+              }
+            });
+            return arr;
+          });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -135,18 +176,27 @@ export default function ModulPage() {
     fetchModulData();
   }, [mounted]);
 
-  // Hook dependencies to reload
+  // Hook filter dependencies to reload
   useEffect(() => {
     if (!mounted) return;
     setCurrentPage(1);
     fetchModulData();
-  }, [search, dateMode, startDate, endDate, modulFilter, resellerFilter, statusFilter, snEmpty, limit, mounted]);
+  }, [dateMode, startDate, endDate, productFilter, resellerFilter, modulFilter, search, limit, mounted]);
 
   // Hook pagination
   useEffect(() => {
     if (!mounted) return;
     fetchModulData(false);
   }, [currentPage]);
+
+  // Auto Refresh Interval (every 10 seconds)
+  useEffect(() => {
+    if (!autoRefresh || !mounted) return;
+    const interval = setInterval(() => {
+      fetchModulData(true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, dateMode, startDate, endDate, productFilter, resellerFilter, modulFilter, search, limit, mounted]);
 
   // Force Sync listener
   useEffect(() => {
@@ -156,7 +206,7 @@ export default function ModulPage() {
     };
     window.addEventListener('bmp-force-sync', handleSync);
     return () => window.removeEventListener('bmp-force-sync', handleSync);
-  }, [mounted, search, dateMode, startDate, endDate, modulFilter, resellerFilter, statusFilter, snEmpty, limit]);
+  }, [mounted, dateMode, startDate, endDate, productFilter, resellerFilter, modulFilter, search, limit]);
 
   const handleReset = () => {
     const today = new Date();
@@ -165,14 +215,14 @@ export default function ModulPage() {
     const dd = String(today.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
-    setSearch('');
     setDateMode('today');
     setStartDate(todayStr);
     setEndDate(todayStr);
-    setModulFilter('');
+    setProductFilter('');
     setResellerFilter('');
-    setStatusFilter('all');
-    setSnEmpty(true);
+    setModulFilter('');
+    setSearch('');
+    setAutoRefresh(false);
     setLimit(20);
     setCurrentPage(1);
   };
@@ -198,11 +248,23 @@ export default function ModulPage() {
     return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
   };
 
-  const getStatusBadge = (txStatus) => {
-    if (txStatus === 20) {
+  const getStatusBadge = (txStatus, sn) => {
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const cleanSn = sn ? String(sn).trim().toUpperCase() : '';
+    const isSuspectSn = !cleanSn || suspectSns.includes(cleanSn);
+
+    if (txStatus === 52 || txStatus === 54) {
+      return <span className="badge status-failed"><i className="fa-solid fa-circle-xmark"></i> Tujuan Salah</span>;
+    } else if (isSuspectSn && txStatus !== 40 && txStatus !== 50) {
+      return <span className="badge status-suspect"><i className="fa-solid fa-triangle-exclamation"></i> Suspect</span>;
+    } else if (txStatus === 20) {
       return <span className="badge status-success"><i className="fa-solid fa-circle-check"></i> Success</span>;
-    } else if (txStatus === 40 || txStatus === 50 || txStatus === 52 || txStatus === 54) {
+    } else if (txStatus === 40) {
       return <span className="badge status-failed"><i className="fa-solid fa-circle-xmark"></i> Failed</span>;
+    } else if (txStatus === 50) {
+      return <span className="badge status-failed"><i className="fa-solid fa-ban"></i> Canceled</span>;
+    } else if (txStatus === 55) {
+      return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Timeout</span>;
     } else {
       return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Code {txStatus}</span>;
     }
@@ -231,6 +293,16 @@ export default function ModulPage() {
   const modulesDoughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    onClick: (event, elements) => {
+      if (elements && elements.length > 0) {
+        const index = elements[0].index;
+        const selectedMod = topLists.modules[index];
+        if (selectedMod) {
+          const matched = modulesList.find(m => m.label.toLowerCase() === selectedMod.name.toLowerCase());
+          if (matched) setModulFilter(String(matched.kode));
+        }
+      }
+    },
     plugins: {
       legend: {
         position: 'bottom',
@@ -274,6 +346,15 @@ export default function ModulPage() {
     responsive: true,
     maintainAspectRatio: false,
     indexAxis: 'y',
+    onClick: (event, elements) => {
+      if (elements && elements.length > 0) {
+        const index = elements[0].index;
+        const selectedProd = topLists.products[index];
+        if (selectedProd && selectedProd.name) {
+          setProductFilter(selectedProd.name);
+        }
+      }
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -310,6 +391,16 @@ export default function ModulPage() {
   const resellersBarOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    onClick: (event, elements) => {
+      if (elements && elements.length > 0) {
+        const index = elements[0].index;
+        const selectedRes = topLists.resellers[index];
+        if (selectedRes) {
+          const matched = resellersList.find(r => r.nama.toLowerCase() === selectedRes.name.toLowerCase());
+          setResellerFilter(matched ? matched.kode : selectedRes.name);
+        }
+      }
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -410,22 +501,84 @@ export default function ModulPage() {
         </div>
       </div>
 
-      {/* Filters and logs table */}
+      {/* Table section with filters, search and auto refresh */}
       <section className="table-section" aria-label="Transaction Records" style={{ marginTop: '20px' }}>
-        <div className="table-controls">
+        {/* Active Filter Badges */}
+        {(productFilter || resellerFilter || modulFilter || search || dateMode !== 'today' || autoRefresh) && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap text-xs px-1">
+            <span className="text-slate-400 font-medium">Filter Aktif:</span>
+            {search && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 font-semibold border border-amber-500/20">
+                <i className="fa-solid fa-magnifying-glass"></i> Cari: "{search}"
+                <button onClick={() => setSearch('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus pencarian">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {dateMode !== 'today' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+                <i className="fa-solid fa-calendar"></i> Tanggal: {dateMode === 'all' ? 'Semua Tanggal' : `${startDate} s/d ${endDate}`}
+                <button onClick={() => setDateMode('today')} className="hover:text-red-500 ml-1 cursor-pointer" title="Reset ke Hari Ini">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {productFilter && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 font-semibold border border-purple-500/20">
+                <i className="fa-solid fa-box"></i> Produk: {productFilter}
+                <button onClick={() => setProductFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter produk">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {resellerFilter && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">
+                <i className="fa-solid fa-user"></i> Reseller: {resellersList.find(r => r.kode === resellerFilter)?.nama || resellerFilter}
+                <button onClick={() => setResellerFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter reseller">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {modulFilter && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-500 font-semibold border border-cyan-500/20">
+                <i className="fa-solid fa-cubes"></i> Modul: {modulesList.find(m => String(m.kode) === String(modulFilter))?.label || modulFilter}
+                <button onClick={() => setModulFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter modul">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {autoRefresh && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                <i className="fa-solid fa-arrows-rotate animate-spin"></i> Auto Refresh (10s)
+                <button onClick={() => setAutoRefresh(false)} className="hover:text-red-500 ml-1 cursor-pointer" title="Matikan Auto Refresh">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            <button
+              onClick={handleReset}
+              className="text-slate-400 hover:text-slate-200 underline text-xs ml-2 cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          </div>
+        )}
+
+        {/* Filter Controls Bar with Search & Auto Refresh */}
+        <div className="table-controls mb-4">
           <div className="search-box">
             <i className="fa-solid fa-magnifying-glass search-icon"></i>
             <input
               type="text"
               id="search-input"
-              placeholder="Search by destination, product, TRXID, reseller..."
+              placeholder="Search destination, product, TRXID, reseller, SN..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div className="filter-actions flex flex-wrap gap-2 items-center">
-            {/* Date Mode Toggle */}
+          <div className="filter-actions flex flex-wrap gap-2.5 items-center">
+            {/* 1. Filter Tanggal */}
             <div className="select-wrapper">
               <i className="fa-solid fa-calendar select-icon"></i>
               <select value={dateMode} onChange={(e) => setDateMode(e.target.value)}>
@@ -435,14 +588,14 @@ export default function ModulPage() {
               </select>
             </div>
 
-            {/* Custom Dates */}
+            {/* Custom Date Pickers */}
             {dateMode === 'custom' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="flex items-center gap-2">
                 <div className="date-filter-wrapper">
                   <i className="fa-solid fa-calendar-days date-icon"></i>
                   <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </div>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>s/d</span>
+                <span className="text-slate-400 text-xs">s/d</span>
                 <div className="date-filter-wrapper">
                   <i className="fa-solid fa-calendar-days date-icon"></i>
                   <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
@@ -450,53 +603,53 @@ export default function ModulPage() {
               </div>
             )}
 
-            {/* Modul Select */}
+            {/* 2. Filter Product */}
             <div className="select-wrapper">
-              <i className="fa-solid fa-cubes select-icon"></i>
-              <select value={modulFilter} onChange={(e) => setModulFilter(e.target.value)}>
-                <option value="">All Modules</option>
-                {modulesList.map(m => (
-                  <option key={m.kode} value={m.kode}>{m.label}</option>
+              <i className="fa-solid fa-box select-icon"></i>
+              <select value={productFilter} onChange={(e) => setProductFilter(e.target.value)}>
+                <option value="">Semua Product</option>
+                {productsList.map((p, idx) => (
+                  <option key={p.kode || p.nama || idx} value={p.kode || p.nama}>{p.nama || p.kode}</option>
                 ))}
               </select>
             </div>
 
-            {/* Reseller Select */}
+            {/* 3. Filter Reseller */}
             <div className="select-wrapper">
               <i className="fa-solid fa-user select-icon"></i>
               <select value={resellerFilter} onChange={(e) => setResellerFilter(e.target.value)}>
-                <option value="">All Resellers</option>
-                {resellersList.map(r => (
-                  <option key={r.kode} value={r.kode}>{r.nama}</option>
+                <option value="">Semua Reseller</option>
+                {resellersList.map((r, idx) => (
+                  <option key={r.kode || r.nama || idx} value={r.nama || r.kode}>{r.nama || r.label || r.kode}</option>
                 ))}
               </select>
             </div>
 
-            {/* Status select */}
+            {/* 4. Filter Modul */}
             <div className="select-wrapper">
-              <i className="fa-solid fa-filter select-icon"></i>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All Statuses</option>
-                <option value="sukses">Success</option>
-                <option value="gagal">Failed</option>
-                <option value="proses">Processing</option>
+              <i className="fa-solid fa-cubes select-icon"></i>
+              <select value={modulFilter} onChange={(e) => setModulFilter(e.target.value)}>
+                <option value="">Semua Modul</option>
+                {modulesList.map((m, idx) => (
+                  <option key={m.kode || m.label || idx} value={m.label || m.kode}>{m.label || m.nama || m.kode}</option>
+                ))}
               </select>
             </div>
 
-            {/* Exclude empty SN checkbox */}
+            {/* Auto Refresh Toggle */}
             <div className="switch-container flex items-center gap-2">
-              <span>Exclude Empty SN</span>
+              <span className="text-xs font-medium text-slate-400">Auto Refresh</span>
               <label className="switch">
                 <input
                   type="checkbox"
-                  checked={!snEmpty}
-                  onChange={(e) => setSnEmpty(!e.target.checked)}
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
                 />
                 <span className="slider"></span>
               </label>
             </div>
 
-            {/* limit selection */}
+            {/* Rows Limit Selection */}
             <div className="select-wrapper">
               <i className="fa-solid fa-list select-icon"></i>
               <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
@@ -506,6 +659,7 @@ export default function ModulPage() {
               </select>
             </div>
 
+            {/* Reset Button */}
             <button onClick={handleReset} className="btn-reset-dash" title="Reset Filters">
               <i className="fa-solid fa-arrow-rotate-left"></i> Reset
             </button>
@@ -513,7 +667,7 @@ export default function ModulPage() {
         </div>
 
         {/* Data Table */}
-        <div className="table-container" style={{ marginTop: '16px' }}>
+        <div className="table-container">
           <table id="transactions-table">
             <thead>
               <tr>
@@ -546,32 +700,71 @@ export default function ModulPage() {
                   <td colSpan={12}>
                     <div className="empty-state">
                       <i className="fa-regular fa-folder-open empty-icon"></i>
-                      <p>No transactions found matching the criteria</p>
+                      <p>No transactions found matching the filter criteria</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                transactions.map((tx) => {
+                transactions.map((tx, idx) => {
+                  const profit = (tx.status === 20 && tx.harga && tx.harga_beli) ? (tx.harga - tx.harga_beli) : (tx.laba || 0);
+                  const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
+
                   return (
-                    <tr key={tx.TrxID} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
-                      <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{tx.TrxID}</td>
+                    <tr key={tx.kode || tx.TrxID || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
+                      <td 
+                        className="font-mono font-semibold cursor-pointer text-blue-400 hover:underline"
+                        onClick={() => setSearch(String(tx.kode || tx.TrxID || ''))}
+                        title="Klik untuk cari TRXID ini"
+                      >
+                        {tx.kode || tx.TrxID || '-'}
+                      </td>
                       <td>{formatDateTime(tx.tgl_entri)}</td>
                       <td>
-                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontWeight: 500 }}>
-                          {tx.kode_produk}
+                        <span 
+                          className="cursor-pointer hover:bg-purple-500/20 hover:text-purple-300 transition-colors"
+                          onClick={() => { if (tx.kode_produk) setProductFilter(tx.kode_produk); }}
+                          style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontWeight: 500 }}
+                          title="Klik untuk filter produk ini"
+                        >
+                          {tx.kode_produk || '-'}
                         </span>
                       </td>
-                      <td>{tx.tujuan}</td>
+                      <td 
+                        className="cursor-pointer hover:text-blue-400 hover:underline"
+                        onClick={() => { if (tx.tujuan) setSearch(tx.tujuan); }}
+                        title="Klik untuk cari nomor tujuan ini"
+                      >
+                        {tx.tujuan || '-'}
+                      </td>
                       <td className="text-right">{formatCurrency(tx.harga)}</td>
                       <td className="text-right">{formatCurrency(tx.harga_beli)}</td>
-                      <td className={`text-right font-bold ${tx.laba >= 0 ? 'text-success' : 'text-danger'}`}>{formatCurrency(tx.laba)}</td>
+                      <td className={`text-right font-bold ${profitClass}`}>{formatCurrency(profit)}</td>
                       <td>{formatCurrency(tx.saldo_supplier)}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                      <td 
+                        style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                        className="cursor-pointer hover:text-blue-400 hover:underline"
+                        onClick={() => { if (tx.sn && tx.sn !== '-') setSearch(tx.sn); }}
+                        title="Klik untuk cari SN ini"
+                      >
                         {tx.sn || <span className="text-muted">-</span>}
                       </td>
-                      <td>{getStatusBadge(tx.status)}</td>
-                      <td className="font-semibold">{tx.nama_reseller || '-'}</td>
-                      <td>{tx.nama_modul || '-'}</td>
+                      <td>
+                        {getStatusBadge(tx.status, tx.sn)}
+                      </td>
+                      <td 
+                        className="font-semibold text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
+                        onClick={() => setResellerFilter(tx.kode_reseller || tx.nama_reseller)}
+                        title="Klik untuk filter reseller ini"
+                      >
+                        {tx.nama_reseller || '-'}
+                      </td>
+                      <td 
+                        className="cursor-pointer hover:text-blue-500 hover:underline"
+                        onClick={() => { if (tx.kode_modul) setModulFilter(String(tx.kode_modul)); }}
+                        title="Klik mefilter modul ini"
+                      >
+                        {tx.nama_modul || '-'}
+                      </td>
                     </tr>
                   );
                 })

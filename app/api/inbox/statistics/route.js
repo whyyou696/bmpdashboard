@@ -78,9 +78,9 @@ export async function GET(request) {
         SUM(CASE WHEN i.status = 46 OR t.status = 52 THEN 1 ELSE 0 END) as duplicateTxs,
         SUM(CASE WHEN t.status IN (40, 50, 55) OR i.status = 40 THEN 1 ELSE 0 END) as failedTxs,
         SUM(CASE WHEN t.status IS NULL AND i.status NOT IN (20, 40, 46) THEN 1 ELSE 0 END) as pendingTxs
-      FROM inbox i
-      LEFT JOIN transaksi t ON i.kode_transaksi = t.kode
-      LEFT JOIN reseller r ON i.kode_reseller = r.kode
+      FROM inbox i WITH (NOLOCK)
+      LEFT JOIN transaksi t WITH (NOLOCK) ON i.kode_transaksi = t.kode
+      LEFT JOIN reseller r WITH (NOLOCK) ON i.kode_reseller = r.kode
       ${whereClause}
     `;
 

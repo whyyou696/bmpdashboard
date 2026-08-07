@@ -30,9 +30,6 @@ export default function MemberPage() {
     totalTrx30Days: 0
   });
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all'); // 'all', 'active', 'inactive'
   const [limit, setLimit] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -75,13 +72,6 @@ export default function MemberPage() {
     return () => window.removeEventListener('bmp-theme-change', handleTheme);
   }, []);
 
-  const handleReset = () => {
-    setSearch('');
-    setStatus('all');
-    setLimit(10);
-    setCurrentPage(1);
-  };
-
   if (!mounted) return null;
 
   const formatCurrency = (val) => {
@@ -89,23 +79,8 @@ export default function MemberPage() {
     return 'Rp ' + Math.round(val).toLocaleString('id-ID');
   };
 
-  // Perform client-side filtering
-  let filteredModules = originalModules.filter(m => {
-    // 1. Search filter
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      const matchLabel = m.label && m.label.toLowerCase().includes(q);
-      const matchKode = m.kode && String(m.kode).includes(q);
-      const matchTujuan = m.tujuan && m.tujuan.toLowerCase().includes(q);
-      if (!matchLabel && !matchKode && !matchTujuan) return false;
-    }
-
-    // 2. Status filter
-    if (status === 'active' && m.aktif !== 1) return false;
-    if (status === 'inactive' && m.aktif !== 0) return false;
-
-    return true;
-  });
+  // Perform client-side filtering (removed filtering)
+  let filteredModules = originalModules;
 
   // Perform client-side pagination
   const totalItems = filteredModules.length;
@@ -349,49 +324,10 @@ export default function MemberPage() {
         </div>
       </div>
 
-      {/* Advanced filters and modules table */}
+      {/* Table section without filters */}
       <section className="table-section" aria-label="Transaction Records" style={{ marginTop: '20px' }}>
-        <div className="table-controls">
-          <div className="search-box">
-            <i className="fa-solid fa-magnifying-glass search-icon"></i>
-            <input
-              type="text"
-              id="search-input"
-              placeholder="Search by ID, label, target IP..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-            />
-          </div>
-
-          <div className="filter-actions flex flex-wrap gap-2 items-center">
-            {/* Status select */}
-            <div className="select-wrapper">
-              <i className="fa-solid fa-filter select-icon"></i>
-              <select value={status} onChange={(e) => { setStatus(e.target.value); setCurrentPage(1); }}>
-                <option value="all">All Supplier</option>
-                <option value="active">Active Only</option>
-                <option value="inactive">Inactive Only</option>
-              </select>
-            </div>
-
-            {/* limit selection */}
-            <div className="select-wrapper">
-              <i className="fa-solid fa-list select-icon"></i>
-              <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setCurrentPage(1); }}>
-                <option value={5}>5 Rows</option>
-                <option value={10}>10 Rows</option>
-                <option value={20}>20 Rows</option>
-              </select>
-            </div>
-
-            <button onClick={handleReset} className="btn-reset-dash" title="Reset Filters">
-              <i className="fa-solid fa-arrow-rotate-left"></i> Reset
-            </button>
-          </div>
-        </div>
-
         {/* Data Table */}
-        <div className="table-container" style={{ marginTop: '16px' }}>
+        <div className="table-container">
           <table id="transactions-table">
             <thead>
               <tr>

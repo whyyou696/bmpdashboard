@@ -45,7 +45,7 @@ export default function Sidebar() {
     { href: '/', label: 'Dashboard', icon: 'fa-chart-line' },
     { href: '/analytics', label: 'Analytics', icon: 'fa-chart-pie' },
     { href: '/inbox', label: 'Inbox', icon: 'fa-inbox' },
-    { href: '/modul', label: 'Modul', icon: 'fa-cubes' },
+    { href: '/modul', label: 'Reseller/Member', icon: 'fa-cubes' },
     { href: '/product', label: 'Product', icon: 'fa-box' },
     { href: '/member', label: 'Supplier', icon: 'fa-users' },
   ];

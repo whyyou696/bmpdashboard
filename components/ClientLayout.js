@@ -81,7 +81,7 @@ export default function ClientLayout({ children }) {
               {pathname === '/' ? 'Transaction Dashboard' : 
                pathname === '/analytics' ? 'Business Intelligence & Analytics' :
                pathname === '/inbox' ? 'Inbox & Request Monitoring' :
-               pathname === '/modul' ? 'Modul & Supplier Performance' :
+               pathname === '/modul' ? 'Reseller / Member Performance' :
                pathname === '/product' ? 'Product Productivity Analysis' :
                pathname === '/member' ? 'Supplier Balance & Performance' : 'BMP Dashboard'}
             </h1>
@@ -89,7 +89,7 @@ export default function ClientLayout({ children }) {
               {pathname === '/' ? 'Monitor and analyze your OtomaX transaction data' :
                pathname === '/analytics' ? 'Interactive charts and financial KPIs' :
                pathname === '/inbox' ? 'Real-time client request feed and debugging' :
-               pathname === '/modul' ? 'Supplier modules efficiency and transaction ratios' :
+               pathname === '/modul' ? 'Reseller & member efficiency and transaction ratios' :
                pathname === '/product' ? 'Monitor product codes, margin distributions, and counts' :
                pathname === '/member' ? 'Supplier lists, limits, and balance statuses' : 'Best Multi Payment'}
             </p>
