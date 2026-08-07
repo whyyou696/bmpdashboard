@@ -233,13 +233,13 @@ export default function Dashboard() {
   };
 
   const getStatusBadge = (txStatus, sn) => {
-    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', '', '0'];
     const cleanSn = sn ? String(sn).trim().toUpperCase() : '';
     const isSuspectSn = !cleanSn || suspectSns.includes(cleanSn);
 
     if (txStatus === 52 || txStatus === 54) {
       return <span className="badge status-failed"><i className="fa-solid fa-circle-xmark"></i> Tujuan Salah</span>;
-    } else if (isSuspectSn && txStatus !== 40 && txStatus !== 50) {
+    } else if (txStatus === 20 && isSuspectSn) {
       return <span className="badge status-suspect"><i className="fa-solid fa-triangle-exclamation"></i> Suspect</span>;
     } else if (txStatus === 20) {
       return <span className="badge status-success"><i className="fa-solid fa-circle-check"></i> Success</span>;
@@ -249,8 +249,10 @@ export default function Dashboard() {
       return <span className="badge status-failed"><i className="fa-solid fa-ban"></i> Canceled</span>;
     } else if (txStatus === 55) {
       return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Timeout</span>;
+    } else if (txStatus === 0 || txStatus === 1 || txStatus === 2 || txStatus === 3) {
+      return <span className="badge status-pending"><i className="fa-solid fa-spinner fa-spin-slow"></i> Pending</span>;
     } else {
-      return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Code {txStatus}</span>;
+      return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Pending ({txStatus})</span>;
     }
   };
 

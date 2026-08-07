@@ -26,7 +26,7 @@ export async function GET(request) {
 
     if (status !== 'all') {
       if (status === 'suspect') {
-        conditions.push("status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE'))");
+        conditions.push("status = 20 AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE', '0'))");
       } else if (status === '40') {
         conditions.push("status IN (40, 52, 54)");
       } else if (status === '54') {
@@ -59,16 +59,16 @@ export async function GET(request) {
     const query = `
       SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN status = 20 AND (sn IS NOT NULL AND LTRIM(RTRIM(sn)) <> '' AND LTRIM(RTRIM(sn)) <> '-' AND UPPER(LTRIM(RTRIM(sn))) NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as successCount,
+        SUM(CASE WHEN status = 20 AND (sn IS NOT NULL AND LTRIM(RTRIM(sn)) <> '' AND LTRIM(RTRIM(sn)) <> '-' AND UPPER(LTRIM(RTRIM(sn))) NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE', '0')) THEN 1 ELSE 0 END) as successCount,
         SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END) as failedCount,
         SUM(CASE WHEN status = 50 THEN 1 ELSE 0 END) as canceledCount,
-        SUM(CASE WHEN status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as suspectCount,
+        SUM(CASE WHEN status = 20 AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE', '0')) THEN 1 ELSE 0 END) as suspectCount,
         SUM(CASE WHEN status IN (52, 54) THEN 1 ELSE 0 END) as wrongNumberCount,
-        SUM(CASE WHEN status NOT IN (20, 40, 50, 52, 54) AND (sn IS NOT NULL AND LTRIM(RTRIM(sn)) <> '' AND LTRIM(RTRIM(sn)) <> '-' AND UPPER(LTRIM(RTRIM(sn))) NOT IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE')) THEN 1 ELSE 0 END) as pendingCount,
+        SUM(CASE WHEN status NOT IN (20, 40, 50, 52, 54) THEN 1 ELSE 0 END) as pendingCount,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga, 0) AS BIGINT) ELSE 0 END) as totalRetail,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga_beli, 0) AS BIGINT) ELSE 0 END) as totalCost,
         SUM(CASE WHEN status = 20 THEN CAST(ISNULL(harga - harga_beli, 0) AS BIGINT) ELSE 0 END) as totalProfit
-      FROM transaksi
+      FROM transaksi WITH (NOLOCK)
       ${whereClause}
     `;
     const result = await dbRequest.query(query);
@@ -117,10 +117,10 @@ export async function GET(request) {
       });
     }
 
-    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', '', '0'];
     const isSuspectTx = (t) => {
       const cleanSn = t.sn ? String(t.sn).trim().toUpperCase() : '';
-      return ![40, 50, 52, 54].includes(t.status) && (!cleanSn || suspectSns.includes(cleanSn));
+      return t.status === 20 && (!cleanSn || suspectSns.includes(cleanSn));
     };
 
     // Apply filtering

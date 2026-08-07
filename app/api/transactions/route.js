@@ -29,7 +29,7 @@ export async function GET(request) {
 
     if (status !== 'all') {
       if (status === 'suspect') {
-        conditions.push("status NOT IN (40, 50, 52, 54) AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE'))");
+        conditions.push("status = 20 AND (sn IS NULL OR LTRIM(RTRIM(sn)) = '' OR LTRIM(RTRIM(sn)) = '-' OR UPPER(LTRIM(RTRIM(sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE', '0'))");
       } else if (status === '40') {
         conditions.push("status IN (40, 52, 54)");
       } else if (status === '54') {
@@ -134,10 +134,10 @@ export async function GET(request) {
       });
     }
 
-    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', '', '0'];
     const isSuspectTx = (t) => {
       const cleanSn = t.sn ? String(t.sn).trim().toUpperCase() : '';
-      return ![40, 50, 52, 54].includes(t.status) && (!cleanSn || suspectSns.includes(cleanSn));
+      return t.status === 20 && (!cleanSn || suspectSns.includes(cleanSn));
     };
 
     // Apply filtering

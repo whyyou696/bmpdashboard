@@ -53,7 +53,7 @@ export async function GET(request) {
 
     if (status && status !== 'all') {
       if (status === 'suspect') {
-        conditions.push("t.status NOT IN (40, 50, 52, 54) AND (t.sn IS NULL OR LTRIM(RTRIM(t.sn)) = '' OR LTRIM(RTRIM(t.sn)) = '-' OR UPPER(LTRIM(RTRIM(t.sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE'))");
+        conditions.push("t.status = 20 AND (t.sn IS NULL OR LTRIM(RTRIM(t.sn)) = '' OR LTRIM(RTRIM(t.sn)) = '-' OR UPPER(LTRIM(RTRIM(t.sn))) IN ('N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', 'NONE', '0'))");
       } else if (status === '40') {
         conditions.push("t.status IN (40, 52, 54)");
       } else if (status === '54') {

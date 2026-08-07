@@ -1,16 +1,27 @@
 import { NextResponse } from 'next/server';
-import { getDbConnection, sql } from '@/lib/db';
+import { getDbConnection } from '@/lib/db';
 
 export async function GET() {
   try {
     const pool = await getDbConnection();
-    const products = await pool.request().query("SELECT DISTINCT kode_produk FROM transaksi WHERE kode_produk IS NOT NULL AND kode_produk != '' ORDER BY kode_produk");
-    const modules = await pool.request().query("SELECT kode, label FROM modul WHERE deleted = 0 ORDER BY label");
-    const resellers = await pool.request().query("SELECT kode, nama FROM reseller WHERE aktif = 1 ORDER BY nama");
+    
+    // Fast queries with NOLOCK
+    let products = [];
+    try {
+      const prodRes = await pool.request().query("SELECT kode as kode_produk FROM produk WITH (NOLOCK) WHERE aktif = 1 ORDER BY kode");
+      products = prodRes.recordset.map(r => r.kode_produk);
+    } catch {
+      const prodRes = await pool.request().query("SELECT DISTINCT TOP 100 kode_produk FROM transaksi WITH (NOLOCK) WHERE kode_reseller LIKE 'BEST%' AND kode_produk IS NOT NULL ORDER BY kode_produk");
+      products = prodRes.recordset.map(r => r.kode_produk);
+    }
+
+    const modulesRes = await pool.request().query("SELECT kode, label FROM modul WITH (NOLOCK) WHERE aktif = 1 ORDER BY label");
+    const resellersRes = await pool.request().query("SELECT kode, nama FROM reseller WITH (NOLOCK) WHERE kode LIKE 'BEST%' AND aktif = 1 ORDER BY nama");
+
     return NextResponse.json({
-      products: products.recordset.map(r => r.kode_produk),
-      modules: modules.recordset,
-      resellers: resellers.recordset
+      products,
+      modules: modulesRes.recordset,
+      resellers: resellersRes.recordset
     });
   } catch (err) {
     return NextResponse.json({
@@ -21,9 +32,9 @@ export async function GET() {
         { kode: 3, label: 'METRO SUP' }
       ],
       resellers: [
-        { kode: 'R001', nama: 'Indo Cell' },
-        { kode: 'R002', nama: 'Best Multipayment' },
-        { kode: 'R003', nama: 'Metro Pulsa' }
+        { kode: 'BEST001', nama: 'DIGIFLAZZ BEST' },
+        { kode: 'BEST0819', nama: 'CHIKA MP RELOAD' },
+        { kode: 'BEST1305', nama: 'PIXEL TELEMEDIA' }
       ]
     });
   }

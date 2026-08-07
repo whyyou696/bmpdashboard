@@ -10,6 +10,7 @@ export async function GET(request) {
   const reseller = searchParams.get('reseller') || '';
   const product = searchParams.get('product') || '';
   const status = searchParams.get('status') || '';
+  const dateMode = searchParams.get('dateMode') || 'today';
   const startDate = searchParams.get('startDate') || '';
   const endDate = searchParams.get('endDate') || '';
   const sortCol = searchParams.get('sortCol') || 'created_at';
@@ -46,10 +47,18 @@ export async function GET(request) {
         dbRequest.input("product", sql.VarChar, product);
       }
 
-      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        conditions.push("CONVERT(date, t.tgl_entri) >= @startDate AND CONVERT(date, t.tgl_entri) <= @endDate");
-        dbRequest.input("startDate", sql.VarChar, startDate);
-        dbRequest.input("endDate", sql.VarChar, endDate);
+      // Date Filtering: Default is 'today', 'all' disables date filtering, 'custom' filters date range
+      if (dateMode !== 'all') {
+        if (dateMode === 'custom' && startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+          conditions.push("CONVERT(date, t.tgl_entri) >= @startDate AND CONVERT(date, t.tgl_entri) <= @endDate");
+          dbRequest.input("startDate", sql.VarChar, startDate);
+          dbRequest.input("endDate", sql.VarChar, endDate);
+        } else if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+          conditions.push("CONVERT(date, t.tgl_entri) = @startDate");
+          dbRequest.input("startDate", sql.VarChar, startDate);
+        } else {
+          conditions.push("CONVERT(date, t.tgl_entri) = CONVERT(date, GETDATE())");
+        }
       }
 
       if (status) {

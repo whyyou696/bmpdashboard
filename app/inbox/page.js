@@ -24,19 +24,16 @@ export default function InboxPage() {
   // States for filter lists (from API)
   const [resellersList, setResellersList] = useState([]);
   const [productsList, setProductsList] = useState([]);
-  const [terminalsList, setTerminalsList] = useState([]);
-  const [serviceCentersList, setServiceCentersList] = useState([]);
 
   // States for filters selection
   const [search, setSearch] = useState('');
   const [reseller, setReseller] = useState('');
   const [product, setProduct] = useState('');
-  const [terminal, setTerminal] = useState('');
-  const [serviceCenter, setServiceCenter] = useState('');
   const [status, setStatus] = useState('');
-  const [msgType, setMsgType] = useState('');
+  const [dateMode, setDateMode] = useState('today'); // Default: Hari Ini
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Paginated inbox data
   const [inboxLogs, setInboxLogs] = useState([]);
@@ -71,14 +68,17 @@ export default function InboxPage() {
   // Live polling parameters
   const [maxInboxId, setMaxInboxId] = useState(0);
 
-  useEffect(() => {
-    setMounted(true);
-    // Populate today's date for range picker
+  const getTodayString = () => {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    const todayStr = getTodayString();
     setStartDate(todayStr);
     setEndDate(todayStr);
   }, []);
@@ -91,8 +91,6 @@ export default function InboxPage() {
         const json = await res.json();
         setResellersList(json.resellers || []);
         setProductsList(json.products || []);
-        setTerminalsList(json.terminals || []);
-        setServiceCentersList(json.serviceCenters || []);
       }
     } catch (err) {
       console.error(err);
@@ -106,11 +104,9 @@ export default function InboxPage() {
       reseller,
       product,
       status,
-      terminal,
-      serviceCenter,
-      startDate,
-      endDate,
-      msgType
+      dateMode,
+      startDate: dateMode === 'all' ? '' : startDate,
+      endDate: dateMode === 'all' ? '' : endDate
     });
 
     try {
@@ -147,11 +143,9 @@ export default function InboxPage() {
       reseller,
       product,
       status,
-      terminal,
-      serviceCenter,
-      startDate,
-      endDate,
-      msgType
+      dateMode,
+      startDate: dateMode === 'all' ? '' : startDate,
+      endDate: dateMode === 'all' ? '' : endDate
     });
 
     try {
@@ -193,7 +187,6 @@ export default function InboxPage() {
     fetchFiltersMetadata();
     fetchInboxBI();
 
-    // Pull first live feed details to establish baseline maxId
     const checkLiveFeed = async () => {
       try {
         const res = await fetch('/api/inbox/live');
@@ -212,13 +205,22 @@ export default function InboxPage() {
     setCurrentPage(1);
     fetchInboxBI();
     fetchInboxLogs();
-  }, [search, reseller, product, terminal, serviceCenter, status, msgType, startDate, endDate, limit, sortCol, sortDir, mounted]);
+  }, [search, reseller, product, status, dateMode, startDate, endDate, limit, sortCol, sortDir, mounted]);
 
   // Handle pagination updates
   useEffect(() => {
     if (!mounted) return;
     fetchInboxLogs(false);
   }, [currentPage]);
+
+  // Auto Refresh interval effect (polls every 10s silently)
+  useEffect(() => {
+    if (!mounted || !autoRefresh) return;
+    const interval = setInterval(() => {
+      fetchInboxLogs(true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, mounted, currentPage, limit, sortCol, sortDir, search, reseller, product, status, dateMode, startDate, endDate]);
 
   // Listen to Force Sync sidebar events
   useEffect(() => {
@@ -229,44 +231,60 @@ export default function InboxPage() {
     };
     window.addEventListener('bmp-force-sync', handleSync);
     return () => window.removeEventListener('bmp-force-sync', handleSync);
-  }, [mounted, search, reseller, product, terminal, serviceCenter, status, msgType, startDate, endDate]);
+  }, [mounted, search, reseller, product, status, dateMode, startDate, endDate]);
 
-  // Polling checks (runs every 30 seconds for live new messages)
-  useEffect(() => {
-    if (!mounted) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/inbox/live?lastId=${maxInboxId}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.newRequests && json.newRequests.length > 0) {
-            setMaxInboxId(json.maxId);
-            // Refresh table logs and BI stats
-            fetchInboxBI();
-            fetchInboxLogs(true);
-          }
-        }
-      } catch (err) {}
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [maxInboxId, mounted]);
+  // Enforce Max 2 Days Date Range Constraint
+  const handleStartDateChange = (newStart) => {
+    setStartDate(newStart);
+    if (newStart && endDate) {
+      const d1 = new Date(newStart);
+      const d2 = new Date(endDate);
+      const diffTime = d2.getTime() - d1.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+      
+      // If range is more than 1 day difference (more than 2 calendar days) or end is before start
+      if (diffDays > 1 || diffDays < 0) {
+        const nextDay = new Date(d1);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const yyyy = nextDay.getFullYear();
+        const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
+        const dd = String(nextDay.getDate()).padStart(2, '0');
+        setEndDate(`${yyyy}-${mm}-${dd}`);
+      }
+    }
+  };
+
+  const handleEndDateChange = (newEnd) => {
+    setEndDate(newEnd);
+    if (newEnd && startDate) {
+      const d1 = new Date(startDate);
+      const d2 = new Date(newEnd);
+      const diffTime = d2.getTime() - d1.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+      
+      if (diffDays > 1) {
+        const prevDay = new Date(d2);
+        prevDay.setDate(prevDay.getDate() - 1);
+        const yyyy = prevDay.getFullYear();
+        const mm = String(prevDay.getMonth() + 1).padStart(2, '0');
+        const dd = String(prevDay.getDate()).padStart(2, '0');
+        setStartDate(`${yyyy}-${mm}-${dd}`);
+      } else if (diffDays < 0) {
+        setStartDate(newEnd);
+      }
+    }
+  };
 
   const handleReset = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
+    const todayStr = getTodayString();
     setSearch('');
     setReseller('');
     setProduct('');
-    setTerminal('');
-    setServiceCenter('');
     setStatus('');
-    setMsgType('');
+    setDateMode('today');
     setStartDate(todayStr);
     setEndDate(todayStr);
+    setAutoRefresh(false);
     setLimit(20);
     setCurrentPage(1);
   };
@@ -274,11 +292,6 @@ export default function InboxPage() {
   if (!mounted) return null;
 
   // Formatting helpers
-  const formatCurrency = (val) => {
-    if (val === null || val === undefined) return 'Rp 0';
-    return 'Rp ' + Math.round(val).toLocaleString('id-ID');
-  };
-
   const formatDateTime = (dateStr) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -319,21 +332,35 @@ export default function InboxPage() {
   const hourlyOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        padding: 12,
+        cornerRadius: 8
+      }
+    },
     scales: {
-      x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } },
-      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } }
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true }
     }
   };
 
-  // 2. Status Distribution Pie
-  const dist = statusDistribution || { success: 0, failed: 0, duplicate: 0, processing: 0, pending: 0 };
+  // 2. Pie chart config
+  const pieLabels = ['Success', 'Duplicate', 'Failed', 'Pending'];
+  const pieCounts = statusDistribution ? [
+    statusDistribution.success || 0,
+    statusDistribution.duplicate || 0,
+    statusDistribution.failed || 0,
+    statusDistribution.pending || 0
+  ] : [0, 0, 0, 0];
+
   const pieConfig = {
-    labels: ['Success', 'Failed', 'Duplicate', 'Processing', 'Pending'],
+    labels: pieLabels,
     datasets: [
       {
-        data: [dist.success, dist.failed, dist.duplicate, dist.processing, dist.pending],
-        backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#94a3b8'],
+        data: pieCounts,
+        backgroundColor: ['#10b981', '#f97316', '#ef4444', '#f59e0b'],
         borderWidth: 0
       }
     ]
@@ -342,18 +369,22 @@ export default function InboxPage() {
   const pieOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { position: 'right', labels: { color: textColor, font: { size: 10 } } } }
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: { color: textColor, boxWidth: 12, font: { size: 11 } }
+      }
+    }
   };
 
-  // 3. Top Resellers Bar Chart
-  const topResellersLabels = topResellers.map(d => d.reseller_name);
-  const topResellersCounts = topResellers.map(d => d.count);
+  // 3. Top resellers chart
   const topResellersConfig = {
-    labels: topResellersLabels,
+    labels: topResellers.map(r => r.name),
     datasets: [
       {
-        data: topResellersCounts,
-        backgroundColor: 'rgba(37, 99, 235, 0.7)',
+        label: 'Requests',
+        data: topResellers.map(r => r.count),
+        backgroundColor: '#0052ff',
         borderRadius: 4
       }
     ]
@@ -364,20 +395,19 @@ export default function InboxPage() {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 8 } } },
-      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 8 } } }
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true }
     }
   };
 
-  // 4. Most Used Products
-  const topProductsLabels = topProducts.map(d => d.product_code);
-  const topProductsCounts = topProducts.map(d => d.count);
+  // 4. Top products chart
   const topProductsConfig = {
-    labels: topProductsLabels,
+    labels: topProducts.map(p => p.product),
     datasets: [
       {
-        data: topProductsCounts,
-        backgroundColor: 'rgba(6, 182, 212, 0.7)',
+        label: 'Requests',
+        data: topProducts.map(p => p.count),
+        backgroundColor: '#6366f1',
         borderRadius: 4
       }
     ]
@@ -388,15 +418,15 @@ export default function InboxPage() {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 8 } } },
-      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 8 } } }
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true }
     }
   };
 
   return (
-    <>
-      {/* Metric Cards grid */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5" aria-label="Key Performance Indicators">
+    <main className="dashboard-layout">
+      {/* Top metrics / KPIs */}
+      <section className="stats-grid" aria-label="Key Performance Indicators">
         <div className="stat-card" id="card-total">
           <div className="stat-icon-wrapper total"><i className="fa-solid fa-list-check"></i></div>
           <div className="stat-info">
@@ -486,22 +516,121 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* Log list with filters */}
+      {/* Log list with filters, search, date range & auto refresh */}
       <section className="table-section" aria-label="Transaction Records" style={{ marginTop: '20px' }}>
-        <div className="table-controls">
+        {/* Active Filter Badges */}
+        {(search || product || reseller || status || dateMode !== 'today' || autoRefresh) && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap text-xs px-1">
+            <span className="text-slate-400 font-medium">Filter Aktif:</span>
+            {search && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 font-semibold border border-amber-500/20">
+                <i className="fa-solid fa-magnifying-glass"></i> Cari: "{search}"
+                <button onClick={() => setSearch('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus pencarian">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {dateMode !== 'today' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+                <i className="fa-solid fa-calendar"></i> Tanggal: {dateMode === 'all' ? 'Semua Tanggal' : `${startDate} s/d ${endDate}`}
+                <button onClick={() => setDateMode('today')} className="hover:text-red-500 ml-1 cursor-pointer" title="Reset ke Hari Ini">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {product && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 font-semibold border border-purple-500/20">
+                <i className="fa-solid fa-box"></i> Produk: {product}
+                <button onClick={() => setProduct('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter produk">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {reseller && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">
+                <i className="fa-solid fa-user"></i> Reseller: {resellersList.find(r => r.kode === reseller)?.nama || reseller}
+                <button onClick={() => setReseller('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter reseller">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {status && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 text-teal-400 font-semibold border border-teal-500/20">
+                <i className="fa-solid fa-filter"></i> Status: {status}
+                <button onClick={() => setStatus('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter status">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {autoRefresh && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                <i className="fa-solid fa-arrows-rotate animate-spin"></i> Auto Refresh (10s)
+                <button onClick={() => setAutoRefresh(false)} className="hover:text-red-500 ml-1 cursor-pointer" title="Matikan Auto Refresh">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            <button
+              onClick={handleReset}
+              className="text-slate-400 hover:text-slate-200 underline text-xs ml-2 cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          </div>
+        )}
+
+        {/* Filter Controls Bar */}
+        <div className="table-controls mb-4">
           <div className="search-box">
             <i className="fa-solid fa-magnifying-glass search-icon"></i>
             <input
               type="text"
               id="search-input"
-              placeholder="Search sender, message, reseller, destination..."
+              placeholder="Search destination, product, TRXID, reseller, SN..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div className="filter-actions flex flex-wrap gap-2 items-center">
-            {/* Reseller select */}
+          <div className="filter-actions flex flex-wrap gap-2.5 items-center">
+            {/* 1. Filter Tanggal: Hari Ini (Default), Semua Tanggal, Rentang Tanggal */}
+            <div className="select-wrapper">
+              <i className="fa-solid fa-calendar select-icon"></i>
+              <select value={dateMode} onChange={(e) => setDateMode(e.target.value)}>
+                <option value="today">Hari Ini (Default)</option>
+                <option value="all">Semua Tanggal</option>
+                <option value="custom">Rentang Tanggal (Maks 2 Hari)</option>
+              </select>
+            </div>
+
+            {/* Custom Date Pickers (Maks 2 Hari Saja) */}
+            {dateMode === 'custom' && (
+              <div className="flex items-center gap-2">
+                <div className="date-filter-wrapper">
+                  <i className="fa-solid fa-calendar-days date-icon"></i>
+                  <input
+                    type="date"
+                    value={startDate}
+                    max={getTodayString()}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    title="Tanggal Mulai"
+                  />
+                </div>
+                <span className="text-slate-400 text-xs font-semibold">s/d</span>
+                <div className="date-filter-wrapper">
+                  <i className="fa-solid fa-calendar-days date-icon"></i>
+                  <input
+                    type="date"
+                    value={endDate}
+                    max={getTodayString()}
+                    onChange={(e) => handleEndDateChange(e.target.value)}
+                    title="Tanggal Akhir (Maksimal 2 Hari)"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 2. Reseller select (Best Multipayment only) */}
             <div className="select-wrapper">
               <i className="fa-solid fa-user select-icon"></i>
               <select value={reseller} onChange={(e) => setReseller(e.target.value)}>
@@ -512,7 +641,7 @@ export default function InboxPage() {
               </select>
             </div>
 
-            {/* Product select */}
+            {/* 3. Product select */}
             <div className="select-wrapper">
               <i className="fa-solid fa-box select-icon"></i>
               <select value={product} onChange={(e) => setProduct(e.target.value)}>
@@ -523,7 +652,7 @@ export default function InboxPage() {
               </select>
             </div>
 
-            {/* Status select */}
+            {/* 4. Status select */}
             <div className="select-wrapper">
               <i className="fa-solid fa-filter select-icon"></i>
               <select value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -536,17 +665,17 @@ export default function InboxPage() {
               </select>
             </div>
 
-            {/* Date limits */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div className="date-filter-wrapper">
-                <i className="fa-solid fa-calendar-days date-icon"></i>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              </div>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>s/d</span>
-              <div className="date-filter-wrapper">
-                <i className="fa-solid fa-calendar-days date-icon"></i>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
+            {/* 5. Auto Refresh Toggle Switch */}
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-700/50">
+              <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Auto Refresh:</span>
+              <label className="switch" title="Auto refresh data setiap 10 detik">
+                <input 
+                  type="checkbox" 
+                  checked={autoRefresh} 
+                  onChange={(e) => setAutoRefresh(e.target.checked)} 
+                />
+                <span className="slider round"></span>
+              </label>
             </div>
 
             {/* Rows Limit */}
@@ -688,7 +817,7 @@ export default function InboxPage() {
                         {el && <span className="mx-1 text-slate-400">...</span>}
                         <button
                           onClick={() => setCurrentPage(p)}
-                          className={`btn-page ${p === currentPage ? 'active' : ''}`}
+                          className={`btn-page-number ${currentPage === p ? 'active' : ''}`}
                         >
                           {p}
                         </button>
@@ -708,144 +837,55 @@ export default function InboxPage() {
         )}
       </section>
 
-      {/* Detailed Modal Window */}
+      {/* Row details popup modal */}
       {selectedRow && (
-        <div className="detail-modal-overlay" onClick={() => setSelectedRow(null)}>
-          <div className="detail-modal-card" onClick={(e) => e.stopPropagation()}>
-
-            {/* Header */}
-            <div className="detail-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="detail-modal-header-icon">
-                  <i className="fa-solid fa-envelope-open-text"></i>
-                </div>
-                <div>
-                  <h3 className="detail-modal-header-title">Message Details</h3>
-                  <span className="detail-modal-header-subtitle">ID #{selectedRow}</span>
-                </div>
-              </div>
-              <button className="detail-modal-close-x" onClick={() => setSelectedRow(null)} title="Close">
+        <div className="modal-backdrop" onClick={() => setSelectedRow(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Detail Log Pesan #{selectedRow}</h3>
+              <button className="btn-close-modal" onClick={() => setSelectedRow(null)}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
-
-            {/* Body */}
-            <div className="detail-modal-body">
+            <div className="modal-body">
               {modalLoading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', gap: '16px' }}>
+                <div className="flex justify-center p-8">
                   <div className="spinner"></div>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Fetching reply details...</span>
                 </div>
               ) : modalDetails ? (
-                <>
-                  {/* Row 1: Transaction ID + Timestamp */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                    <div className="detail-modal-info-card blue">
-                      <div className="detail-modal-label">
-                        <i className="fa-solid fa-hashtag" style={{ fontSize: '11px', color: '#3b82f6' }}></i>
-                        <span>Transaction ID</span>
-                      </div>
-                      <p className="detail-modal-value">{modalDetails.transaction_id}</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-xs text-slate-400 block">Waktu Masuk</span>
+                      <span className="font-semibold text-sm">{formatDateTime(modalDetails.created_at)}</span>
                     </div>
-                    <div className="detail-modal-info-card indigo">
-                      <div className="detail-modal-label">
-                        <i className="fa-solid fa-clock" style={{ fontSize: '11px', color: '#6366f1' }}></i>
-                        <span>Timestamp</span>
-                      </div>
-                      <p className="detail-modal-value sm">{formatDateTime(modalDetails.created_at)}</p>
+                    <div>
+                      <span className="text-xs text-slate-400 block">Pengirim</span>
+                      <span className="font-mono text-sm">{modalDetails.sender_ip}</span>
                     </div>
-                  </div>
-
-                  {/* Row 2: Reseller + Sender */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                    <div className="detail-modal-info-card green">
-                      <div className="detail-modal-label">
-                        <i className="fa-solid fa-user-tag" style={{ fontSize: '11px', color: '#10b981' }}></i>
-                        <span>Reseller</span>
-                      </div>
-                      <p className="detail-modal-value md">{modalDetails.reseller_code}</p>
-                      <p className="detail-modal-sub">{modalDetails.reseller_name}</p>
+                    <div>
+                      <span className="text-xs text-slate-400 block">Reseller</span>
+                      <span className="font-semibold text-sm">{modalDetails.reseller_name} ({modalDetails.reseller_code})</span>
                     </div>
-                    <div className="detail-modal-info-card amber">
-                      <div className="detail-modal-label">
-                        <i className="fa-solid fa-server" style={{ fontSize: '11px', color: '#f59e0b' }}></i>
-                        <span>Sender IP / Terminal</span>
-                      </div>
-                      <p className="detail-modal-value sm" style={{ fontFamily: 'monospace' }}>{modalDetails.sender_ip}</p>
-                      <p className="detail-modal-sub">Terminal {modalDetails.terminal}</p>
+                    <div>
+                      <span className="text-xs text-slate-400 block">Produk / Tujuan</span>
+                      <span className="font-mono text-sm">{modalDetails.product_code} / {modalDetails.destination}</span>
                     </div>
                   </div>
-
-                  {/* Row 3: Product + Destination */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-                    <div className="detail-modal-info-card pink">
-                      <div className="detail-modal-label">
-                        <i className="fa-solid fa-box" style={{ fontSize: '11px', color: '#ec4899' }}></i>
-                        <span>Product Code</span>
-                      </div>
-                      <p className="detail-modal-value">{modalDetails.product_code}</p>
-                    </div>
-                    <div className="detail-modal-info-card sky">
-                      <div className="detail-modal-label">
-                        <i className="fa-solid fa-mobile-screen" style={{ fontSize: '11px', color: '#0ea5e9' }}></i>
-                        <span>Destination</span>
-                      </div>
-                      <p className="detail-modal-value md" style={{ fontFamily: 'monospace' }}>{modalDetails.destination}</p>
+                  <div>
+                    <span className="text-xs text-slate-400 block mb-1">Isi Pesan</span>
+                    <div className="bg-slate-900 p-3 rounded font-mono text-xs text-emerald-400 break-all select-all">
+                      {modalDetails.message}
                     </div>
                   </div>
-
-                  {/* Request Message */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <div className="detail-modal-label" style={{ marginBottom: '10px' }}>
-                      <i className="fa-solid fa-arrow-right-to-bracket" style={{ fontSize: '11px', color: 'var(--text-muted)' }}></i>
-                      <span>Request Message</span>
-                    </div>
-                    <div className="detail-modal-msg-box request">
-                      {modalDetails.message || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No message content</span>}
-                    </div>
-                  </div>
-
-                  {/* Outbox Response */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <div className="detail-modal-label" style={{ marginBottom: '10px' }}>
-                      <i className="fa-solid fa-arrow-right-from-bracket" style={{ fontSize: '11px', color: '#10b981' }}></i>
-                      <span>Outbox Response Reply</span>
-                    </div>
-                    <div className="detail-modal-msg-box response">
-                      {modalDetails.response_message || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Awaiting response...</span>}
-                    </div>
-                  </div>
-
-                  {/* Footer metadata row */}
-                  <div className="detail-modal-meta-row">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <i className="fa-solid fa-satellite-dish" style={{ fontSize: '10px' }}></i>
-                      <span>{modalDetails.service_center}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '10px' }}></i>
-                      <span>{formatDateTime(modalDetails.status_timestamp)}</span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: '#ef4444', fontWeight: 600, fontSize: '14px' }}>
-                  <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: '24px', marginBottom: '12px', display: 'block' }}></i>
-                  Gagal memuat detail data dari server.
                 </div>
+              ) : (
+                <p className="text-sm text-slate-400">Data tidak ditemukan.</p>
               )}
-            </div>
-
-            {/* Close button footer */}
-            <div className="detail-modal-footer">
-              <button className="detail-modal-close-btn" onClick={() => setSelectedRow(null)}>
-                <i className="fa-solid fa-xmark"></i>
-                Close Details
-              </button>
             </div>
           </div>
         </div>
       )}
-    </>
+    </main>
   );
 }

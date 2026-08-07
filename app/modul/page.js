@@ -249,13 +249,13 @@ export default function ModulPage() {
   };
 
   const getStatusBadge = (txStatus, sn) => {
-    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', ''];
+    const suspectSns = ['N/A', 'UPDATE', 'NULL', 'SUSPECT', '0000', 'PEND', '-', 'NONE', '', '0'];
     const cleanSn = sn ? String(sn).trim().toUpperCase() : '';
     const isSuspectSn = !cleanSn || suspectSns.includes(cleanSn);
 
     if (txStatus === 52 || txStatus === 54) {
       return <span className="badge status-failed"><i className="fa-solid fa-circle-xmark"></i> Tujuan Salah</span>;
-    } else if (isSuspectSn && txStatus !== 40 && txStatus !== 50) {
+    } else if (txStatus === 20 && isSuspectSn) {
       return <span className="badge status-suspect"><i className="fa-solid fa-triangle-exclamation"></i> Suspect</span>;
     } else if (txStatus === 20) {
       return <span className="badge status-success"><i className="fa-solid fa-circle-check"></i> Success</span>;
@@ -265,17 +265,19 @@ export default function ModulPage() {
       return <span className="badge status-failed"><i className="fa-solid fa-ban"></i> Canceled</span>;
     } else if (txStatus === 55) {
       return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Timeout</span>;
+    } else if (txStatus === 0 || txStatus === 1 || txStatus === 2 || txStatus === 3) {
+      return <span className="badge status-pending"><i className="fa-solid fa-spinner fa-spin-slow"></i> Pending</span>;
     } else {
-      return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Code {txStatus}</span>;
+      return <span className="badge status-pending"><i className="fa-solid fa-clock"></i> Pending ({txStatus})</span>;
     }
   };
 
-  // Modules Doughnut Data
-  const modulesDoughnutData = {
-    labels: topLists.modules.map(m => m.name),
+  // Reseller / Member Doughnut Data (Chart 1 - Left)
+  const resellersDoughnutData = {
+    labels: (topLists.resellers || []).map(r => r.name),
     datasets: [
       {
-        data: topLists.modules.map(m => m.total_trx),
+        data: (topLists.resellers || []).map(r => r.total_trx),
         backgroundColor: [
           'rgba(59, 130, 246, 0.8)',  // blue
           'rgba(6, 182, 212, 0.8)',   // cyan
@@ -290,16 +292,17 @@ export default function ModulPage() {
     ]
   };
 
-  const modulesDoughnutOptions = {
+  const resellersDoughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
     onClick: (event, elements) => {
       if (elements && elements.length > 0) {
         const index = elements[0].index;
-        const selectedMod = topLists.modules[index];
-        if (selectedMod) {
-          const matched = modulesList.find(m => m.label.toLowerCase() === selectedMod.name.toLowerCase());
-          if (matched) setModulFilter(String(matched.kode));
+        const selectedRes = (topLists.resellers || [])[index];
+        if (selectedRes) {
+          const matched = resellersList.find(r => (r.nama && r.nama.toLowerCase() === selectedRes.name.toLowerCase()) || r.kode === selectedRes.kode);
+          if (matched) setResellerFilter(matched.kode);
+          else setResellerFilter(selectedRes.kode || selectedRes.name);
         }
       }
     },
@@ -329,12 +332,12 @@ export default function ModulPage() {
     cutout: '65%'
   };
 
-  // Products Horizontal Bar Data
+  // Products Horizontal Bar Data (Chart 2 - Middle)
   const productsBarData = {
-    labels: topLists.products.map(p => p.name),
+    labels: (topLists.products || []).map(p => p.name),
     datasets: [
       {
-        data: topLists.products.map(p => p.total_trx),
+        data: (topLists.products || []).map(p => p.total_trx),
         backgroundColor: 'rgba(6, 182, 212, 0.75)',
         hoverBackgroundColor: '#06b6d4',
         borderRadius: 4
@@ -349,7 +352,7 @@ export default function ModulPage() {
     onClick: (event, elements) => {
       if (elements && elements.length > 0) {
         const index = elements[0].index;
-        const selectedProd = topLists.products[index];
+        const selectedProd = (topLists.products || [])[index];
         if (selectedProd && selectedProd.name) {
           setProductFilter(selectedProd.name);
         }
@@ -375,12 +378,12 @@ export default function ModulPage() {
     }
   };
 
-  // Resellers Vertical Bar Data
-  const resellersBarData = {
-    labels: topLists.resellers.map(r => r.name),
+  // Modules Vertical Bar Data (Chart 3 - Right)
+  const modulesBarData = {
+    labels: (topLists.modules || []).map(m => m.name),
     datasets: [
       {
-        data: topLists.resellers.map(r => r.total_trx),
+        data: (topLists.modules || []).map(m => m.total_trx),
         backgroundColor: 'rgba(59, 130, 246, 0.75)',
         hoverBackgroundColor: '#3b82f6',
         borderRadius: 4
@@ -388,16 +391,16 @@ export default function ModulPage() {
     ]
   };
 
-  const resellersBarOptions = {
+  const modulesBarOptions = {
     responsive: true,
     maintainAspectRatio: false,
     onClick: (event, elements) => {
       if (elements && elements.length > 0) {
         const index = elements[0].index;
-        const selectedRes = topLists.resellers[index];
-        if (selectedRes) {
-          const matched = resellersList.find(r => r.nama.toLowerCase() === selectedRes.name.toLowerCase());
-          setResellerFilter(matched ? matched.kode : selectedRes.name);
+        const selectedMod = (topLists.modules || [])[index];
+        if (selectedMod) {
+          const matched = modulesList.find(m => m.label && m.label.toLowerCase() === selectedMod.name.toLowerCase());
+          setModulFilter(matched ? String(matched.kode) : selectedMod.name);
         }
       }
     },
@@ -455,29 +458,29 @@ export default function ModulPage() {
 
       {/* Visual Charts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ marginTop: '20px' }}>
-        {/* Modules Doughnut */}
+        {/* Chart 1: Reseller / Member Doughnut */}
         <div 
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Modules By Volume</h3>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Reseller/Member By Volume</h3>
           <div className="h-48 relative flex items-center justify-center">
-            {topLists.modules.length > 0 ? (
-              <Doughnut data={modulesDoughnutData} options={modulesDoughnutOptions} />
+            {topLists.resellers && topLists.resellers.length > 0 ? (
+              <Doughnut data={resellersDoughnutData} options={resellersDoughnutOptions} />
             ) : (
               <span className="text-slate-400 text-xs">No data available</span>
             )}
           </div>
         </div>
 
-        {/* Products Horizontal Bar */}
+        {/* Chart 2: Products Horizontal Bar */}
         <div 
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Products By Volume</h3>
           <div className="h-48 relative">
-            {topLists.products.length > 0 ? (
+            {topLists.products && topLists.products.length > 0 ? (
               <Bar data={productsBarData} options={productsBarOptions} />
             ) : (
               <span className="text-slate-400 text-xs">No data available</span>
@@ -485,15 +488,15 @@ export default function ModulPage() {
           </div>
         </div>
 
-        {/* Resellers Vertical Bar */}
+        {/* Chart 3: Modules Vertical Bar */}
         <div 
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Resellers By Volume</h3>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Modules By Volume</h3>
           <div className="h-48 relative">
-            {topLists.resellers.length > 0 ? (
-              <Bar data={resellersBarData} options={resellersBarOptions} />
+            {topLists.modules && topLists.modules.length > 0 ? (
+              <Bar data={modulesBarData} options={modulesBarOptions} />
             ) : (
               <span className="text-slate-400 text-xs">No data available</span>
             )}
