@@ -164,10 +164,28 @@ export default function InboxPage() {
   };
 
   // Open detail row modal
-  const openRowDetails = async (rowId) => {
+  const openRowDetails = async (rowId, rowData = null) => {
     setSelectedRow(rowId);
     setModalLoading(true);
-    setModalDetails(null);
+    if (rowData) {
+      setModalDetails({
+        inbox_id: rowData.inbox_id,
+        transaction_id: rowData.transaction_id || rowData.inbox_id,
+        created_at: rowData.created_at,
+        sender_ip: rowData.sender_ip,
+        reseller_code: rowData.reseller_code,
+        reseller_name: rowData.reseller_name,
+        product_code: rowData.product_code,
+        destination: rowData.destination,
+        message: rowData.message,
+        status: rowData.status,
+        terminal: rowData.terminal || '-',
+        service_center: rowData.service_center || '-',
+        reference_id: rowData.reference_id || '-'
+      });
+    } else {
+      setModalDetails(null);
+    }
     try {
       const res = await fetch(`/api/inbox/${rowId}`);
       if (res.ok) {
@@ -175,11 +193,22 @@ export default function InboxPage() {
         setModalDetails(json);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load inbox details:", err);
     } finally {
       setModalLoading(false);
     }
   };
+
+  // Close modal on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setSelectedRow(null);
+    };
+    if (selectedRow) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRow]);
 
   // Fetch initial filters, live polling metadata, stats
   useEffect(() => {
@@ -720,12 +749,13 @@ export default function InboxPage() {
                 <th onClick={() => { setSortCol('status'); setSortDir(prev => prev === 'asc' ? 'desc' : 'asc'); }}>
                   Status <i className={`fa-solid ${sortCol === 'status' ? (sortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'} ml-1`}></i>
                 </th>
+                <th style={{ textAlign: 'center', width: '60px' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loadingTable ? (
                 <tr className="placeholder-row">
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <div className="table-loader-wrapper">
                       <div className="spinner"></div>
                       <span>Mengambil data inbox OtomaX...</span>
@@ -734,7 +764,7 @@ export default function InboxPage() {
                 </tr>
               ) : inboxLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <div className="empty-state">
                       <i className="fa-regular fa-folder-open empty-icon"></i>
                       <p>Tidak ada data inbox yang ditemukan</p>
@@ -757,7 +787,12 @@ export default function InboxPage() {
                   }
                   
                   return (
-                    <tr key={log.inbox_id} onClick={() => openRowDetails(log.inbox_id)} className="inbox-row-clickable hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
+                    <tr 
+                      key={log.inbox_id} 
+                      onClick={() => openRowDetails(log.inbox_id, log)} 
+                      className="inbox-row-clickable hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer"
+                      title="Klik baris untuk melihat detail log inbox"
+                    >
                       <td style={{ fontWeight: 600, fontFamily: 'monospace' }} className="text-blue-500 font-semibold">{log.inbox_id}</td>
                       <td className="text-slate-300 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
                       <td style={{ color: 'var(--text-secondary)' }} className="font-mono">{log.sender_ip}</td>
@@ -769,7 +804,7 @@ export default function InboxPage() {
                         </span>
                       </td>
                       <td className="font-mono">{log.destination}</td>
-                      <td style={{ maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.message}>
+                      <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.message}>
                         {log.message}
                       </td>
                       <td>
@@ -784,6 +819,18 @@ export default function InboxPage() {
                         }}>
                           {log.status}
                         </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          className="inbox-detail-btn"
+                          title="Lihat Detail Log"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openRowDetails(log.inbox_id, log);
+                          }}
+                        >
+                          <i className="fa-solid fa-eye text-blue-500"></i>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -839,49 +886,142 @@ export default function InboxPage() {
 
       {/* Row details popup modal */}
       {selectedRow && (
-        <div className="modal-backdrop" onClick={() => setSelectedRow(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Detail Log Pesan #{selectedRow}</h3>
-              <button className="btn-close-modal" onClick={() => setSelectedRow(null)}>
+        <div className="detail-modal-overlay" onClick={() => setSelectedRow(null)}>
+          <div className="detail-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="detail-modal-header">
+              <div className="flex items-center gap-3">
+                <div className="detail-modal-header-icon">
+                  <i className="fa-solid fa-envelope-open-text"></i>
+                </div>
+                <div>
+                  <h3 className="detail-modal-header-title">Detail Log Pesan #{selectedRow}</h3>
+                  <p className="detail-modal-header-subtitle">Informasi lengkap transaksi & pesan inbox OtomaX</p>
+                </div>
+              </div>
+              <button className="detail-modal-close-x" onClick={() => setSelectedRow(null)} title="Tutup Modal (Esc)">
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
-            <div className="modal-body">
-              {modalLoading ? (
-                <div className="flex justify-center p-8">
+
+            <div className="detail-modal-body">
+              {modalLoading && !modalDetails ? (
+                <div className="flex flex-col items-center justify-center p-10 gap-3">
                   <div className="spinner"></div>
+                  <span className="text-xs text-slate-400">Memuat rincian pesan inbox...</span>
                 </div>
               ) : modalDetails ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-xs text-slate-400 block">Waktu Masuk</span>
-                      <span className="font-semibold text-sm">{formatDateTime(modalDetails.created_at)}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="detail-modal-info-card blue">
+                      <div className="detail-modal-label">
+                        <i className="fa-solid fa-hashtag text-blue-500"></i>
+                        <span>ID Log / Trx</span>
+                      </div>
+                      <p className="detail-modal-value font-mono">#{modalDetails.transaction_id || modalDetails.inbox_id || selectedRow}</p>
+                      <p className="detail-modal-sub font-mono">Inbox: #{modalDetails.inbox_id || selectedRow}</p>
                     </div>
-                    <div>
-                      <span className="text-xs text-slate-400 block">Pengirim</span>
-                      <span className="font-mono text-sm">{modalDetails.sender_ip}</span>
+
+                    <div className="detail-modal-info-card indigo">
+                      <div className="detail-modal-label">
+                        <i className="fa-solid fa-clock text-indigo-500"></i>
+                        <span>Waktu Entri</span>
+                      </div>
+                      <p className="detail-modal-value sm">{formatDateTime(modalDetails.created_at)}</p>
+                      <p className="detail-modal-sub font-mono">IP: {modalDetails.sender_ip || '-'}</p>
                     </div>
-                    <div>
-                      <span className="text-xs text-slate-400 block">Reseller</span>
-                      <span className="font-semibold text-sm">{modalDetails.reseller_name} ({modalDetails.reseller_code})</span>
+
+                    <div className="detail-modal-info-card green">
+                      <div className="detail-modal-label">
+                        <i className="fa-solid fa-user text-emerald-500"></i>
+                        <span>Reseller</span>
+                      </div>
+                      <p className="detail-modal-value md" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {modalDetails.reseller_name || '-'}
+                      </p>
+                      <p className="detail-modal-sub font-mono font-semibold text-blue-400">{modalDetails.reseller_code || '-'}</p>
                     </div>
-                    <div>
-                      <span className="text-xs text-slate-400 block">Produk / Tujuan</span>
-                      <span className="font-mono text-sm">{modalDetails.product_code} / {modalDetails.destination}</span>
+
+                    <div className="detail-modal-info-card amber">
+                      <div className="detail-modal-label">
+                        <i className="fa-solid fa-box text-amber-500"></i>
+                        <span>Produk & Tujuan</span>
+                      </div>
+                      <p className="detail-modal-value font-mono">{modalDetails.product_code || '-'}</p>
+                      <p className="detail-modal-sub font-mono font-semibold">{modalDetails.destination || '-'}</p>
+                    </div>
+
+                    <div className="detail-modal-info-card sky">
+                      <div className="detail-modal-label">
+                        <i className="fa-solid fa-shield-halved text-sky-500"></i>
+                        <span>Status</span>
+                      </div>
+                      <div className="mt-1">
+                        <span style={{
+                          padding: '3px 10px',
+                          borderRadius: '16px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          display: 'inline-block',
+                          ...(modalDetails.status === 'Success'
+                            ? { background: 'rgba(16,185,129,0.15)', color: '#059669', border: '1px solid rgba(16,185,129,0.3)' }
+                            : modalDetails.status === 'Duplicate Transaction'
+                            ? { background: 'rgba(249,115,22,0.15)', color: '#ea580c', border: '1px solid rgba(249,115,22,0.3)' }
+                            : modalDetails.status === 'Failed'
+                            ? { background: 'rgba(239,68,68,0.15)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)' }
+                            : { background: 'rgba(59,130,246,0.15)', color: '#2563eb', border: '1px solid rgba(59,130,246,0.3)' })
+                        }}>
+                          {modalDetails.status || 'Pending'}
+                        </span>
+                      </div>
+                      {modalDetails.reference_id && modalDetails.reference_id !== '-' && (
+                        <p className="detail-modal-sub font-mono mt-1" title={modalDetails.reference_id}>Ref: {modalDetails.reference_id}</p>
+                      )}
+                    </div>
+
+                    <div className="detail-modal-info-card pink">
+                      <div className="detail-modal-label">
+                        <i className="fa-solid fa-server text-pink-500"></i>
+                        <span>Terminal / Center</span>
+                      </div>
+                      <p className="detail-modal-value sm">Terminal: {modalDetails.terminal || '-'}</p>
+                      <p className="detail-modal-sub">Center: {modalDetails.service_center || '-'}</p>
                     </div>
                   </div>
+
                   <div>
-                    <span className="text-xs text-slate-400 block mb-1">Isi Pesan</span>
-                    <div className="bg-slate-900 p-3 rounded font-mono text-xs text-emerald-400 break-all select-all">
-                      {modalDetails.message}
+                    <div className="detail-modal-label mb-1.5">
+                      <i className="fa-solid fa-comment-dots text-blue-500"></i>
+                      <span>Isi Pesan Masuk (Request)</span>
+                    </div>
+                    <div className="detail-modal-msg-box request select-all">
+                      {modalDetails.message || '-'}
                     </div>
                   </div>
+
+                  {modalDetails.response_message && modalDetails.response_message !== '-' && (
+                    <div>
+                      <div className="detail-modal-label mb-1.5">
+                        <i className="fa-solid fa-reply text-emerald-500"></i>
+                        <span>Balasan Outbox (Response)</span>
+                      </div>
+                      <div className="detail-modal-msg-box response select-all">
+                        {modalDetails.response_message}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">Data tidak ditemukan.</p>
+                <div className="p-8 text-center text-slate-400 text-sm">
+                  <i className="fa-regular fa-circle-question text-2xl mb-2 block"></i>
+                  Data log inbox tidak ditemukan.
+                </div>
               )}
+            </div>
+
+            <div className="detail-modal-footer">
+              <button className="detail-modal-close-btn" onClick={() => setSelectedRow(null)}>
+                <i className="fa-solid fa-check"></i> Tutup
+              </button>
             </div>
           </div>
         </div>
@@ -889,3 +1029,4 @@ export default function InboxPage() {
     </main>
   );
 }
+
