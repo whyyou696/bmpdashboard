@@ -21,7 +21,11 @@ export default function LoginPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (username.trim() === 'adm01' && password === 'admpas01') {
+    const inputUser = username.trim().toLowerCase();
+    const isAdm01 = inputUser === 'adm01' && password === 'admpas01';
+    const isAndre = inputUser === 'andre' && password === 'andrebmp';
+
+    if (isAdm01 || isAndre) {
       sessionStorage.setItem('isLoggedIn', 'true');
       router.push('/');
     } else {
