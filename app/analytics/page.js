@@ -46,7 +46,9 @@ export default function AnalyticsPage() {
     totalProfit: { value: 0, growth: 0, sparkline: [] },
     successRate: { value: 0, growth: 0, sparkline: [] },
     todayRevenue: { value: 0, sparkline: [] },
-    todayProfit: { value: 0, sparkline: [] }
+    todayProfit: { value: 0, sparkline: [] },
+    yesterdayRevenue: { value: 0, sparkline: [] },
+    yesterdayProfit: { value: 0, sparkline: [] }
   });
   const [isDemo, setIsDemo] = useState(false);
 
@@ -142,13 +144,24 @@ export default function AnalyticsPage() {
         const kpiJson = await kpiRes.json();
         setIsDemo(kpiJson.isDemo);
         if (kpiJson.kpis) {
-          // Wrap the todayRevenue and todayProfit with sparklines if missing
+          // Wrap today & yesterday metrics with sparklines if missing
           const updatedKpis = { ...kpiJson.kpis };
-          if (!updatedKpis.todayRevenue.sparkline) {
+          if (!updatedKpis.todayRevenue) updatedKpis.todayRevenue = { value: 0, sparkline: [] };
+          if (!updatedKpis.todayProfit) updatedKpis.todayProfit = { value: 0, sparkline: [] };
+          if (!updatedKpis.yesterdayRevenue) updatedKpis.yesterdayRevenue = { value: 0, sparkline: [] };
+          if (!updatedKpis.yesterdayProfit) updatedKpis.yesterdayProfit = { value: 0, sparkline: [] };
+
+          if (!updatedKpis.todayRevenue.sparkline || updatedKpis.todayRevenue.sparkline.length === 0) {
             updatedKpis.todayRevenue.sparkline = [60, 80, 75, 90, 85, 95, 100, 110, 105, 120];
           }
-          if (!updatedKpis.todayProfit.sparkline) {
+          if (!updatedKpis.todayProfit.sparkline || updatedKpis.todayProfit.sparkline.length === 0) {
             updatedKpis.todayProfit.sparkline = [40, 50, 45, 55, 50, 60, 65, 75, 70, 80];
+          }
+          if (!updatedKpis.yesterdayRevenue.sparkline || updatedKpis.yesterdayRevenue.sparkline.length === 0) {
+            updatedKpis.yesterdayRevenue.sparkline = [55, 75, 70, 85, 80, 90, 95, 105, 100, 115];
+          }
+          if (!updatedKpis.yesterdayProfit.sparkline || updatedKpis.yesterdayProfit.sparkline.length === 0) {
+            updatedKpis.yesterdayProfit.sparkline = [35, 45, 40, 50, 45, 55, 60, 70, 65, 75];
           }
           setKpis(updatedKpis);
         }
@@ -383,7 +396,8 @@ export default function AnalyticsPage() {
 
   const formatCurrency = (val) => {
     if (val === null || val === undefined) return 'Rp 0';
-    return 'Rp ' + Math.round(val).toLocaleString('id-ID');
+    const num = Number(val) || 0;
+    return 'Rp ' + Math.round(num).toLocaleString('id-ID');
   };
 
   const formatDateTime = (dateStr) => {
@@ -907,15 +921,15 @@ export default function AnalyticsPage() {
             </span>
           </div>
           <h2 className="text-2xl font-heading font-extrabold tracking-tight truncate">
-            {formatCurrency(range === 'today' ? kpis.todayRevenue.value * 0.94 : kpis.todayRevenue.value)}
+            {formatCurrency(range === 'today' ? (kpis.yesterdayRevenue?.value || 0) : (kpis.todayRevenue?.value || 0))}
           </h2>
           <div className="text-[10px] text-slate-400 mt-1 mb-3">
             {range === 'today' ? 'Closing transaction count' : 'Live transaction count'}
           </div>
           <div className="h-10 w-full">
-            {kpis.todayRevenue.sparkline && kpis.todayRevenue.sparkline.length > 0 && (
+            {((range === 'today' ? kpis.yesterdayRevenue : kpis.todayRevenue)?.sparkline?.length > 0) && (
               <Line
-                data={getSparklineConfig(kpis.todayRevenue.sparkline, '#0052ff')}
+                data={getSparklineConfig((range === 'today' ? kpis.yesterdayRevenue : kpis.todayRevenue).sparkline, '#0052ff')}
                 options={sparklineOptions}
               />
             )}
@@ -937,15 +951,15 @@ export default function AnalyticsPage() {
             </span>
           </div>
           <h2 className="text-2xl font-heading font-extrabold tracking-tight text-success truncate">
-            {formatCurrency(range === 'today' ? kpis.todayProfit.value * 0.93 : kpis.todayProfit.value)}
+            {formatCurrency(range === 'today' ? (kpis.yesterdayProfit?.value || 0) : (kpis.todayProfit?.value || 0))}
           </h2>
           <div className="text-[10px] text-slate-400 mt-1 mb-3">
             {range === 'today' ? 'Closing margin count' : 'Live margin count'}
           </div>
           <div className="h-10 w-full">
-            {kpis.todayProfit.sparkline && kpis.todayProfit.sparkline.length > 0 && (
+            {((range === 'today' ? kpis.yesterdayProfit : kpis.todayProfit)?.sparkline?.length > 0) && (
               <Line
-                data={getSparklineConfig(kpis.todayProfit.sparkline, '#10b981')}
+                data={getSparklineConfig((range === 'today' ? kpis.yesterdayProfit : kpis.todayProfit).sparkline, '#10b981')}
                 options={sparklineOptions}
               />
             )}

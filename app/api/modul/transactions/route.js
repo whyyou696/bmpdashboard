@@ -166,6 +166,17 @@ export async function GET(request) {
     `;
     const topResellersResult = await buildRequestWithParams().query(topResellersQuery);
 
+    const topProfitMembersQuery = `
+      SELECT TOP 5 ISNULL(r.nama, 'Unknown') as name, COUNT(*) as total_trx, SUM(CASE WHEN t.status = 20 THEN 1 ELSE 0 END) as success_trx, SUM(CASE WHEN t.status = 20 THEN ISNULL(t.harga - t.harga_beli, 0) ELSE 0 END) as total_profit
+      FROM transaksi t
+      LEFT JOIN modul m ON t.kode_modul = m.kode
+      LEFT JOIN reseller r ON t.kode_reseller = r.kode
+      ${whereClause}
+      GROUP BY r.nama
+      ORDER BY total_profit DESC
+    `;
+    const topProfitMembersResult = await buildRequestWithParams().query(topProfitMembersQuery);
+
     const dataQuery = `
       SELECT 
         t.kode,
@@ -210,7 +221,8 @@ export async function GET(request) {
       topLists: {
         modules: topModulesResult.recordset,
         products: topProductsResult.recordset,
-        resellers: topResellersResult.recordset
+        resellers: topResellersResult.recordset,
+        profitMembers: topProfitMembersResult.recordset
       },
       pagination: { page, limit, total: stats.total_trx || 0, totalPages: Math.ceil((stats.total_trx || 0) / limit) }
     });
@@ -385,12 +397,21 @@ export async function GET(request) {
       .slice(0, 5);
 
     const resCounts = {};
+    const resProfits = {};
     filtered.forEach(t => {
       resCounts[t.nama_reseller] = (resCounts[t.nama_reseller] || 0) + 1;
+      if (t.status === 20) {
+        resProfits[t.nama_reseller] = (resProfits[t.nama_reseller] || 0) + (t.laba !== undefined ? t.laba : (t.harga - t.harga_beli));
+      }
     });
     const topResellers = Object.entries(resCounts)
       .map(([name, count]) => ({ name, total_trx: count, success_trx: Math.round(count * 0.8) }))
       .sort((a, b) => b.total_trx - a.total_trx)
+      .slice(0, 5);
+
+    const topProfitMembers = Object.entries(resProfits)
+      .map(([name, profit]) => ({ name, total_profit: profit, total_trx: resCounts[name] || 0, success_trx: Math.round((resCounts[name] || 0) * 0.8) }))
+      .sort((a, b) => b.total_profit - a.total_profit)
       .slice(0, 5);
 
     const moduleBalances = {
@@ -420,7 +441,8 @@ export async function GET(request) {
       topLists: {
         modules: topModules,
         products: topProducts,
-        resellers: topResellers
+        resellers: topResellers,
+        profitMembers: topProfitMembers
       },
       pagination: { page, limit, total: totalTrx, totalPages: Math.ceil(totalTrx / limit) }
     });

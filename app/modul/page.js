@@ -49,7 +49,8 @@ export default function ModulPage() {
   const [topLists, setTopLists] = useState({
     modules: [],
     products: [],
-    resellers: []
+    resellers: [],
+    profitMembers: []
   });
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -119,7 +120,7 @@ export default function ModulPage() {
         const dataList = json.data || [];
         setTransactions(dataList);
         setProductivity(json.productivity || {});
-        setTopLists(json.topLists || { modules: [], products: [], resellers: [] });
+        setTopLists(json.topLists || { modules: [], products: [], resellers: [], profitMembers: [] });
         setTotalItems(json.pagination?.total || 0);
         setTotalPages(json.pagination?.totalPages || 0);
 
@@ -378,29 +379,30 @@ export default function ModulPage() {
     }
   };
 
-  // Modules Vertical Bar Data (Chart 3 - Right)
-  const modulesBarData = {
-    labels: (topLists.modules || []).map(m => m.name),
+  // Profit Members Vertical Bar Data (Chart 3 - Right)
+  const profitMembersBarData = {
+    labels: (topLists.profitMembers || []).map(m => m.name),
     datasets: [
       {
-        data: (topLists.modules || []).map(m => m.total_trx),
-        backgroundColor: 'rgba(59, 130, 246, 0.75)',
-        hoverBackgroundColor: '#3b82f6',
+        label: 'Profit Member',
+        data: (topLists.profitMembers || []).map(m => m.total_profit || 0),
+        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+        hoverBackgroundColor: '#10b981',
         borderRadius: 4
       }
     ]
   };
 
-  const modulesBarOptions = {
+  const profitMembersBarOptions = {
     responsive: true,
     maintainAspectRatio: false,
     onClick: (event, elements) => {
       if (elements && elements.length > 0) {
         const index = elements[0].index;
-        const selectedMod = (topLists.modules || [])[index];
-        if (selectedMod) {
-          const matched = modulesList.find(m => m.label && m.label.toLowerCase() === selectedMod.name.toLowerCase());
-          setModulFilter(matched ? String(matched.kode) : selectedMod.name);
+        const selectedMember = (topLists.profitMembers || [])[index];
+        if (selectedMember && selectedMember.name) {
+          const matched = resellersList.find(r => r.nama && r.nama.toLowerCase() === selectedMember.name.toLowerCase());
+          setResellerFilter(matched ? String(matched.kode) : selectedMember.name);
         }
       }
     },
@@ -408,7 +410,7 @@ export default function ModulPage() {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (context) => ` ${context.raw} Trx`
+          label: (context) => ` Profit: ${formatCurrency(context.raw)}`
         }
       }
     },
@@ -419,7 +421,15 @@ export default function ModulPage() {
       },
       y: {
         grid: { color: 'rgba(148, 163, 184, 0.05)' },
-        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 9 } }
+        ticks: {
+          color: '#94a3b8',
+          font: { family: 'Inter', size: 9 },
+          callback: (value) => {
+            if (value >= 1e6) return `Rp ${(value / 1e6).toFixed(1)}Jt`;
+            if (value >= 1e3) return `Rp ${(value / 1e3).toFixed(0)}rb`;
+            return `Rp ${value}`;
+          }
+        }
       }
     }
   };
@@ -488,15 +498,15 @@ export default function ModulPage() {
           </div>
         </div>
 
-        {/* Chart 3: Modules Vertical Bar */}
+        {/* Chart 3: Top 5 Profit Member Vertical Bar */}
         <div 
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Modules By Volume</h3>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5" style={{ letterSpacing: '1px' }}>Top 5 Profit Member</h3>
           <div className="h-48 relative">
-            {topLists.modules && topLists.modules.length > 0 ? (
-              <Bar data={modulesBarData} options={modulesBarOptions} />
+            {topLists.profitMembers && topLists.profitMembers.length > 0 ? (
+              <Bar data={profitMembersBarData} options={profitMembersBarOptions} />
             ) : (
               <span className="text-slate-400 text-xs">No data available</span>
             )}
@@ -544,8 +554,8 @@ export default function ModulPage() {
             )}
             {modulFilter && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-500 font-semibold border border-cyan-500/20">
-                <i className="fa-solid fa-cubes"></i> Modul: {modulesList.find(m => String(m.kode) === String(modulFilter))?.label || modulFilter}
-                <button onClick={() => setModulFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter modul">
+                <i className="fa-solid fa-truck-field"></i> Supplier: {modulesList.find(m => String(m.kode) === String(modulFilter))?.label || modulFilter}
+                <button onClick={() => setModulFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter supplier">
                   <i className="fa-solid fa-xmark"></i>
                 </button>
               </span>
@@ -628,11 +638,11 @@ export default function ModulPage() {
               </select>
             </div>
 
-            {/* 4. Filter Modul */}
+            {/* 4. Filter Supplier */}
             <div className="select-wrapper">
-              <i className="fa-solid fa-cubes select-icon"></i>
+              <i className="fa-solid fa-truck-field select-icon"></i>
               <select value={modulFilter} onChange={(e) => setModulFilter(e.target.value)}>
-                <option value="">Semua Modul</option>
+                <option value="">Semua Supplier</option>
                 {modulesList.map((m, idx) => (
                   <option key={m.kode || m.label || idx} value={m.label || m.kode}>{m.label || m.nama || m.kode}</option>
                 ))}
@@ -685,7 +695,7 @@ export default function ModulPage() {
                 <th>SN / Reference</th>
                 <th>Status</th>
                 <th>Reseller</th>
-                <th>Modul</th>
+                <th>Supplier</th>
               </tr>
             </thead>
             <tbody>
@@ -694,7 +704,7 @@ export default function ModulPage() {
                   <td colSpan={12}>
                     <div className="table-loader-wrapper">
                       <div className="spinner"></div>
-                      <span>Fetching module transaction records...</span>
+                      <span>Fetching supplier transaction records...</span>
                     </div>
                   </td>
                 </tr>
@@ -764,7 +774,7 @@ export default function ModulPage() {
                       <td 
                         className="cursor-pointer hover:text-blue-500 hover:underline"
                         onClick={() => { if (tx.kode_modul) setModulFilter(String(tx.kode_modul)); }}
-                        title="Klik mefilter modul ini"
+                        title="Klik untuk filter supplier ini"
                       >
                         {tx.nama_modul || '-'}
                       </td>
