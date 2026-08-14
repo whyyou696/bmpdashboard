@@ -56,6 +56,16 @@ export default function ModulPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Reseller / Member Summary Table States
+  const [resellersSummary, setResellersSummary] = useState([]);
+  const [resellerSummaryFilter, setResellerSummaryFilter] = useState('');
+  const [resellerDateMode, setResellerDateMode] = useState('today'); // Default: 'today' (Hari Ini)
+  const [resellerStartDate, setResellerStartDate] = useState('');
+  const [resellerEndDate, setResellerEndDate] = useState('');
+  const [resellerCurrentPage, setResellerCurrentPage] = useState(1);
+  const [resellerLimit, setResellerLimit] = useState(10);
+  const [loadingResellers, setLoadingResellers] = useState(true);
+
   // Set default dates
   useEffect(() => {
     setMounted(true);
@@ -66,6 +76,8 @@ export default function ModulPage() {
     const todayStr = `${yyyy}-${mm}-${dd}`;
     setStartDate(todayStr);
     setEndDate(todayStr);
+    setResellerStartDate(todayStr);
+    setResellerEndDate(todayStr);
   }, []);
 
   // Fetch filter dropdown options
@@ -80,6 +92,41 @@ export default function ModulPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // Fetch reseller performance summary
+  const fetchResellersSummary = async () => {
+    setLoadingResellers(true);
+    let startVal = '';
+    let endVal = '';
+    if (resellerDateMode === 'today') {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      startVal = `${yyyy}-${mm}-${dd}`;
+      endVal = startVal;
+    } else if (resellerDateMode === 'custom') {
+      startVal = resellerStartDate;
+      endVal = resellerEndDate;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        dateMode: resellerDateMode,
+        startDate: startVal,
+        endDate: endVal
+      });
+      const res = await fetch(`/api/modul/resellers?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        setResellersSummary(json.resellers || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingResellers(false);
     }
   };
 
@@ -175,6 +222,7 @@ export default function ModulPage() {
     if (!mounted) return;
     fetchFilterInit();
     fetchModulData();
+    fetchResellersSummary();
   }, [mounted]);
 
   // Hook filter dependencies to reload
@@ -183,6 +231,13 @@ export default function ModulPage() {
     setCurrentPage(1);
     fetchModulData();
   }, [dateMode, startDate, endDate, productFilter, resellerFilter, modulFilter, search, limit, mounted]);
+
+  // Hook reseller filter dependencies to reload summary
+  useEffect(() => {
+    if (!mounted) return;
+    setResellerCurrentPage(1);
+    fetchResellersSummary();
+  }, [resellerDateMode, resellerStartDate, resellerEndDate, mounted]);
 
   // Hook pagination
   useEffect(() => {
@@ -204,6 +259,7 @@ export default function ModulPage() {
     const handleSync = () => {
       setCurrentPage(1);
       fetchModulData();
+      fetchResellersSummary();
     };
     window.addEventListener('bmp-force-sync', handleSync);
     return () => window.removeEventListener('bmp-force-sync', handleSync);
@@ -228,7 +284,39 @@ export default function ModulPage() {
     setCurrentPage(1);
   };
 
+  const handleResetResellerFilter = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    setResellerDateMode('today');
+    setResellerStartDate(todayStr);
+    setResellerEndDate(todayStr);
+    setResellerSummaryFilter('');
+    setResellerLimit(10);
+    setResellerCurrentPage(1);
+  };
+
   if (!mounted) return null;
+
+  // Reseller summary filtering and pagination
+  const filteredResellers = resellersSummary.filter(r => {
+    if (!resellerSummaryFilter) return true;
+    const filterVal = String(resellerSummaryFilter).toLowerCase().trim();
+    return (
+      (r.kode && String(r.kode).toLowerCase() === filterVal) ||
+      (r.nama && String(r.nama).toLowerCase() === filterVal) ||
+      (r.kode && String(r.kode).toLowerCase().includes(filterVal)) ||
+      (r.nama && String(r.nama).toLowerCase().includes(filterVal))
+    );
+  });
+
+  const totalResellerItems = filteredResellers.length;
+  const totalResellerPages = Math.ceil(totalResellerItems / resellerLimit);
+  const startResellerIdx = (resellerCurrentPage - 1) * resellerLimit;
+  const paginatedResellers = filteredResellers.slice(startResellerIdx, startResellerIdx + resellerLimit);
 
   const formatCurrency = (val) => {
     if (val === null || val === undefined) return 'Rp 0';
@@ -515,8 +603,255 @@ export default function ModulPage() {
         </div>
       </div>
 
-      {/* Table section with filters, search and auto refresh */}
-      <section className="table-section" aria-label="Transaction Records" style={{ marginTop: '20px' }}>
+      {/* Reseller / Member Performance Summary Table (with Profit Column & Date Filters) */}
+      <section className="table-section" aria-label="Reseller / Member Performance Records" style={{ marginTop: '24px' }}>
+        <div style={{ padding: '24px 32px 12px 32px' }}>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 font-heading">
+            <i className="fa-solid fa-users text-brandBlue dark:text-brandCyan"></i>
+            Reseller / Member Performance
+          </h3>
+          <p className="text-xs text-slate-400 mt-1">
+            Data performa {resellerDateMode === 'today' ? 'hari ini' : resellerDateMode === 'all' ? 'semua tanggal' : `${resellerStartDate} s/d ${resellerEndDate}`}, status saldo, dan total profit per reseller/member (klik baris untuk memfilter log transaksi di bawah)
+          </p>
+        </div>
+
+        {/* Active Filter Badges for Reseller Table */}
+        {(resellerSummaryFilter || resellerDateMode !== 'today' || resellerFilter) && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap text-xs px-8">
+            <span className="text-slate-400 font-medium">Filter Aktif Reseller:</span>
+            {resellerSummaryFilter && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">
+                <i className="fa-solid fa-user"></i> Reseller: {resellersList.find(r => r.kode === resellerSummaryFilter || r.nama === resellerSummaryFilter)?.nama || resellerSummaryFilter}
+                <button onClick={() => setResellerSummaryFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter reseller">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {resellerDateMode !== 'today' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+                <i className="fa-solid fa-calendar"></i> Tanggal: {resellerDateMode === 'all' ? 'Semua Tanggal' : `${resellerStartDate} s/d ${resellerEndDate}`}
+                <button onClick={() => setResellerDateMode('today')} className="hover:text-red-500 ml-1 cursor-pointer" title="Reset ke Hari Ini">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            {resellerFilter && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 font-semibold border border-cyan-500/20">
+                <i className="fa-solid fa-user-check"></i> Filter Log: {resellersList.find(r => r.kode === resellerFilter)?.nama || resellerFilter}
+                <button onClick={() => setResellerFilter('')} className="hover:text-red-500 ml-1 cursor-pointer" title="Hapus filter log terpilih">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </span>
+            )}
+            <button
+              onClick={handleResetResellerFilter}
+              className="text-slate-400 hover:text-slate-200 underline text-xs ml-2 cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          </div>
+        )}
+
+        {/* Filter Controls Bar for Reseller Table (without Search input) */}
+        <div className="table-controls mb-4 px-8">
+          <div className="filter-actions flex flex-wrap gap-2.5 items-center w-full">
+            {/* 1. Filter Tanggal */}
+            <div className="select-wrapper">
+              <i className="fa-solid fa-calendar select-icon"></i>
+              <select value={resellerDateMode} onChange={(e) => setResellerDateMode(e.target.value)}>
+                <option value="today">Hari Ini</option>
+                <option value="all">Semua Tanggal</option>
+                <option value="custom">Rentang Tanggal</option>
+              </select>
+            </div>
+
+            {/* Custom Date Pickers */}
+            {resellerDateMode === 'custom' && (
+              <div className="flex items-center gap-2">
+                <div className="date-filter-wrapper">
+                  <i className="fa-solid fa-calendar-days date-icon"></i>
+                  <input type="date" value={resellerStartDate} onChange={(e) => setResellerStartDate(e.target.value)} />
+                </div>
+                <span className="text-slate-400 text-xs">s/d</span>
+                <div className="date-filter-wrapper">
+                  <i className="fa-solid fa-calendar-days date-icon"></i>
+                  <input type="date" value={resellerEndDate} onChange={(e) => setResellerEndDate(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* 2. Filter Reseller / Member Dropdown */}
+            <div className="select-wrapper">
+              <i className="fa-solid fa-user select-icon"></i>
+              <select 
+                value={resellerSummaryFilter} 
+                onChange={(e) => {
+                  setResellerSummaryFilter(e.target.value);
+                  setResellerCurrentPage(1);
+                }}
+              >
+                <option value="">Semua Reseller</option>
+                {(resellersList.length > 0 ? resellersList : resellersSummary).map((r, idx) => (
+                  <option key={r.kode || r.nama || idx} value={r.kode || r.nama}>
+                    {r.nama || r.label || r.kode}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Rows Limit Selection */}
+            <div className="select-wrapper">
+              <i className="fa-solid fa-list select-icon"></i>
+              <select value={resellerLimit} onChange={(e) => { setResellerLimit(Number(e.target.value)); setResellerCurrentPage(1); }}>
+                <option value={5}>5 Rows</option>
+                <option value={10}>10 Rows</option>
+                <option value={20}>20 Rows</option>
+              </select>
+            </div>
+
+            {/* 4. Reset Button */}
+            <button onClick={handleResetResellerFilter} className="btn-reset-dash" title="Reset Filter Reseller">
+              <i className="fa-solid fa-arrow-rotate-left"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        <div className="table-container">
+          <table id="resellers-table">
+            <thead>
+              <tr>
+                <th>Reseller / Member Name</th>
+                <th>Kode Reseller</th>
+                <th>Status</th>
+                <th className="text-right">Current Saldo</th>
+                <th>
+                  {resellerDateMode === 'today' ? 'Today\'s Transactions' : resellerDateMode === 'all' ? 'All-Time Transactions' : 'Transactions'}
+                </th>
+                <th className="text-right">Profit</th>
+                <th>Success Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingResellers ? (
+                <tr className="placeholder-row">
+                  <td colSpan={7}>
+                    <div className="table-loader-wrapper">
+                      <div className="spinner"></div>
+                      <span>Fetching reseller performance data...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedResellers.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>
+                    <div className="empty-state">
+                      <i className="fa-regular fa-folder-open empty-icon"></i>
+                      <p>No reseller found matching the filter criteria</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedResellers.map((r) => {
+                  const isSelected = resellerFilter && (String(resellerFilter).toLowerCase() === String(r.kode).toLowerCase() || String(resellerFilter).toLowerCase() === String(r.nama).toLowerCase());
+                  return (
+                    <tr
+                      key={r.kode}
+                      className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer transition-colors ${isSelected ? 'bg-blue-500/10 border-l-4 border-brandBlue' : ''}`}
+                      onClick={() => {
+                        if (isSelected) {
+                          setResellerFilter('');
+                        } else {
+                          setResellerFilter(r.kode);
+                        }
+                      }}
+                      title="Klik untuk memfilter log transaksi reseller ini"
+                    >
+                      <td className="font-semibold text-slate-700 dark:text-slate-200">
+                        <div className="flex items-center gap-2">
+                          <i className="fa-solid fa-user-tag text-xs text-brandBlue dark:text-brandCyan"></i>
+                          <span className="hover:underline">{r.nama}</span>
+                          {isSelected && (
+                            <span className="text-[10px] bg-brandBlue text-white px-1.5 py-0.5 rounded font-bold ml-1">Filtered</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="font-mono text-xs text-blue-400 font-semibold">{r.kode || '-'}</td>
+                      <td>
+                        {r.aktif === 1 ? (
+                          <span className="badge status-success"><i className="fa-solid fa-circle-check"></i> Active</span>
+                        ) : (
+                          <span className="badge status-failed"><i className="fa-solid fa-circle-xmark"></i> Inactive</span>
+                        )}
+                      </td>
+                      <td className="text-right font-medium">{formatCurrency(r.saldo)}</td>
+                      <td>{r.total_trx.toLocaleString('id-ID')} Txs</td>
+                      <td className={`text-right font-bold ${r.total_profit >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {formatCurrency(r.total_profit)}
+                      </td>
+                      <td className="font-bold text-brandBlue dark:text-brandCyan">{r.success_rate}%</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Reseller Pagination Controls */}
+        {!loadingResellers && totalResellerPages > 1 && (
+          <footer className="table-footer">
+            <div className="pagination-info">
+              Showing {startResellerIdx + 1} to {Math.min(startResellerIdx + resellerLimit, totalResellerItems)} of {totalResellerItems} resellers
+            </div>
+            <nav className="pagination-controls" aria-label="Reseller Pagination Navigation">
+              <button
+                className="btn-pagination"
+                disabled={resellerCurrentPage === 1}
+                onClick={() => setResellerCurrentPage(p => Math.max(1, p - 1))}
+              >
+                <i className="fa-solid fa-chevron-left"></i> Previous
+              </button>
+              <div className="page-numbers">
+                {Array.from({ length: totalResellerPages }, (_, i) => i + 1)
+                  .filter(p => Math.abs(p - resellerCurrentPage) <= 2 || p === 1 || p === totalResellerPages)
+                  .map((p, idx, arr) => {
+                    const el = idx > 0 && p - arr[idx - 1] > 1;
+                    return (
+                      <span key={p} className="flex items-center">
+                        {el && <span className="mx-1 text-slate-400">...</span>}
+                        <button
+                          onClick={() => setResellerCurrentPage(p)}
+                          className={`btn-page ${p === resellerCurrentPage ? 'active' : ''}`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+              </div>
+              <button
+                className="btn-pagination"
+                disabled={resellerCurrentPage === totalResellerPages}
+                onClick={() => setResellerCurrentPage(p => Math.min(totalResellerPages, p + 1))}
+              >
+                Next <i className="fa-solid fa-chevron-right"></i>
+              </button>
+            </nav>
+          </footer>
+        )}
+      </section>
+
+      {/* Realtime Transactions Ledger Section with filters, search and auto refresh */}
+      <section className="table-section" aria-label="Transaction Records" style={{ marginTop: '24px' }}>
+        <div style={{ padding: '24px 32px 12px 32px' }}>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 font-heading">
+            <i className="fa-solid fa-list-check text-brandBlue dark:text-brandCyan"></i>
+            Realtime Transactions Ledger
+          </h3>
+          <p className="text-xs text-slate-400 mt-1">
+            Log mutasi dan status transaksi realtime dari member/reseller & supplier
+          </p>
+        </div>
         {/* Active Filter Badges */}
         {(productFilter || resellerFilter || modulFilter || search || dateMode !== 'today' || autoRefresh) && (
           <div className="flex items-center gap-2 mb-3 flex-wrap text-xs px-1">
