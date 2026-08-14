@@ -172,7 +172,7 @@ console.log('\n✨ Keunggulan bmpdashboard.exe:');
 console.log('  1. Mandiri (Single File Executable) - Langsung jalan di PC/laptop lain.');
 console.log('  2. Tanpa Terminal - Tidak ada popup layar hitam cmd/powershell.');
 console.log('  3. Tanpa Install Node.js - Runtime Node.js & Next.js sudah tertanam di dalam .exe.');
-console.log('  4. Otomatis Buka Browser - Langsung membuka http://localhost:3000 saat dijalankan.');
+console.log('  4. Otomatis Buka Browser - Langsung membuka http://localhost:3001 saat dijalankan.');
 console.log('  5. Menu System Tray di Pojok Bawah - Bisa Buka Browser, Edit .env, Restart, & Keluar.');
 console.log('  6. Otomatis Buat Shortcut di Desktop.');
 console.log('====================================================\n');

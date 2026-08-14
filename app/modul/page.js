@@ -447,15 +447,6 @@ export default function ModulPage() {
           </div>
         </div>
 
-        <div className="stat-card" id="card-success">
-          <div className="stat-icon-wrapper success"><i className="fa-solid fa-money-bill-trend-up"></i></div>
-          <div className="stat-info">
-            <span className="stat-label">Total Laba</span>
-            <h2 className="stat-value text-success">{formatCurrency(productivity.totalLaba)}</h2>
-            <span className="stat-meta">{productivity.successRate}% Success rate ({productivity.totalTrx} Trxs)</span>
-          </div>
-        </div>
-
         <div className="stat-card" id="card-failed">
           <div className="stat-icon-wrapper retail"><i className="fa-solid fa-wallet"></i></div>
           <div className="stat-info">
@@ -464,12 +455,22 @@ export default function ModulPage() {
             <span className="stat-meta">Available supplier limits</span>
           </div>
         </div>
+
+
+        <div className="stat-card" id="card-success">
+          <div className="stat-icon-wrapper success"><i className="fa-solid fa-money-bill-trend-up"></i></div>
+          <div className="stat-info">
+            <span className="stat-label">Total Laba</span>
+            <h2 className="stat-value text-success">{formatCurrency(productivity.totalLaba)}</h2>
+            <span className="stat-meta">{productivity.successRate}% Success rate ({productivity.totalTrx} Trxs)</span>
+          </div>
+        </div>
       </section>
 
       {/* Visual Charts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ marginTop: '20px' }}>
         {/* Chart 1: Reseller / Member Doughnut */}
-        <div 
+        <div
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
@@ -484,7 +485,7 @@ export default function ModulPage() {
         </div>
 
         {/* Chart 2: Products Horizontal Bar */}
-        <div 
+        <div
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
@@ -499,7 +500,7 @@ export default function ModulPage() {
         </div>
 
         {/* Chart 3: Top 5 Profit Member Vertical Bar */}
-        <div 
+        <div
           className="bg-white dark:bg-darkCard rounded-2xl border border-lightBorder dark:border-darkBorder shadow-sm flex flex-col hover:border-brandBlue/15 transition-all"
           style={{ padding: '32px' }}
         >
@@ -724,7 +725,7 @@ export default function ModulPage() {
 
                   return (
                     <tr key={tx.kode || tx.TrxID || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
-                      <td 
+                      <td
                         className="font-mono font-semibold cursor-pointer text-blue-400 hover:underline"
                         onClick={() => setSearch(String(tx.kode || tx.TrxID || ''))}
                         title="Klik untuk cari TRXID ini"
@@ -733,7 +734,7 @@ export default function ModulPage() {
                       </td>
                       <td>{formatDateTime(tx.tgl_entri)}</td>
                       <td>
-                        <span 
+                        <span
                           className="cursor-pointer hover:bg-purple-500/20 hover:text-purple-300 transition-colors"
                           onClick={() => { if (tx.kode_produk) setProductFilter(tx.kode_produk); }}
                           style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontWeight: 500 }}
@@ -742,7 +743,7 @@ export default function ModulPage() {
                           {tx.kode_produk || '-'}
                         </span>
                       </td>
-                      <td 
+                      <td
                         className="cursor-pointer hover:text-blue-400 hover:underline"
                         onClick={() => { if (tx.tujuan) setSearch(tx.tujuan); }}
                         title="Klik untuk cari nomor tujuan ini"
@@ -753,7 +754,7 @@ export default function ModulPage() {
                       <td className="text-right">{formatCurrency(tx.harga_beli)}</td>
                       <td className={`text-right font-bold ${profitClass}`}>{formatCurrency(profit)}</td>
                       <td>{formatCurrency(tx.saldo_supplier)}</td>
-                      <td 
+                      <td
                         style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
                         className="cursor-pointer hover:text-blue-400 hover:underline"
                         onClick={() => { if (tx.sn && tx.sn !== '-') setSearch(tx.sn); }}
@@ -764,14 +765,14 @@ export default function ModulPage() {
                       <td>
                         {getStatusBadge(tx.status, tx.sn)}
                       </td>
-                      <td 
+                      <td
                         className="font-semibold text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
                         onClick={() => setResellerFilter(tx.kode_reseller || tx.nama_reseller)}
                         title="Klik untuk filter reseller ini"
                       >
                         {tx.nama_reseller || '-'}
                       </td>
-                      <td 
+                      <td
                         className="cursor-pointer hover:text-blue-500 hover:underline"
                         onClick={() => { if (tx.kode_modul) setModulFilter(String(tx.kode_modul)); }}
                         title="Klik untuk filter supplier ini"

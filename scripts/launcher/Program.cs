@@ -27,7 +27,7 @@ namespace BMPDashboardLauncher
         private static string envPath;
         private static string serverLogPath;
         private static string errorLogPath;
-        private static int serverPort = 3000;
+        private static int serverPort = 3001;
         private static IntPtr jobObjectHandle = IntPtr.Zero;
 
         private const string MUTEX_NAME = "Global\\BMPDashboard_App_SingleInstance_Mutex_WhyYou696";
@@ -213,7 +213,7 @@ namespace BMPDashboardLauncher
 
         private static int ReadPortFromConfig()
         {
-            int port = 3000;
+            int port = 3001;
             if (File.Exists(envPath))
             {
                 try
